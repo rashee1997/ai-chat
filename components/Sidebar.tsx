@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Plus,
   Search,
@@ -17,6 +17,11 @@ import {
   Star,
 } from "lucide-react";
 import { DBConversation } from "@/lib/db";
+
+const SIDEBAR_MIN_WIDTH = 200;
+const SIDEBAR_MAX_WIDTH = 420;
+const SIDEBAR_DEFAULT_WIDTH = 256;
+const SIDEBAR_WIDTH_STORAGE_KEY = "sidebar-width";
 
 interface SidebarProps {
   conversations: DBConversation[];
@@ -43,6 +48,47 @@ export default function Sidebar({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [width, setWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
+  const isResizing = useRef(false);
+
+  // Restore a remembered width (desktop-only resizing; see the drag handle below).
+  useEffect(() => {
+    const stored = localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
+    const parsed = stored ? parseInt(stored, 10) : NaN;
+    if (!Number.isNaN(parsed)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of a value persisted outside React (localStorage)
+      setWidth(Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, parsed)));
+    }
+  }, []);
+
+  useEffect(() => {
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!isResizing.current) return;
+      setWidth(Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, e.clientX)));
+    };
+    const handlePointerUp = () => {
+      if (!isResizing.current) return;
+      isResizing.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      setWidth((w) => {
+        localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(w));
+        return w;
+      });
+    };
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, []);
+
+  const handleResizeStart = () => {
+    isResizing.current = true;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  };
 
   const filteredConversations = conversations.filter((c) =>
     c.title.toLowerCase().includes(search.toLowerCase())
@@ -87,7 +133,11 @@ export default function Sidebar({
   };
 
   return (
-    <aside className="w-64 border-r border-border bg-surface-sunken h-full flex flex-col select-none" id="app-sidebar">
+    <aside
+      style={{ width, maxWidth: "100vw" }}
+      className="relative flex-shrink-0 border-r border-border bg-surface-sunken h-full flex flex-col select-none"
+      id="app-sidebar"
+    >
       {/* Top Section: App Title & Model Selection */}
       <div className="p-4 border-b border-border flex flex-col space-y-3" id="sidebar-header">
         <div className="flex items-center space-x-2.5">
@@ -199,6 +249,14 @@ export default function Sidebar({
           )}
         </div>
       </div>
+
+      {/* Desktop-only drag handle to resize the sidebar; width is remembered
+          per session via localStorage. */}
+      <div
+        onPointerDown={handleResizeStart}
+        className="hidden lg:block absolute top-0 right-0 h-full w-1.5 -mr-0.5 cursor-col-resize hover:bg-primary/40 active:bg-primary/60 z-10 touch-none"
+        title="Drag to resize sidebar"
+      />
     </aside>
   );
 

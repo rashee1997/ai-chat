@@ -12,8 +12,9 @@ import {
   GitBranch,
 } from "lucide-react";
 import { Message, Artifact } from "@/lib/types";
-import { parseMessageContent } from "@/lib/parser";
+import { parseMessageContent, parseBackgroundJobStatus } from "@/lib/parser";
 import StreamingMarkdown from "@/components/StreamingMarkdown";
+import BackgroundJobStatus from "@/components/BackgroundJobStatus";
 
 function getArtifactIcon(type: string) {
   switch (type) {
@@ -63,6 +64,7 @@ interface MessageRowProps {
 function MessageRow({ message, isStreaming, onSelectArtifact, activeArtifactId }: MessageRowProps) {
   const isUser = message.role === "user";
   const { conversationalText, artifact } = parseMessageContent(message.content);
+  const jobStatus = !isUser ? parseBackgroundJobStatus(conversationalText) : null;
 
   return (
     <div className={`flex space-x-4 ${isUser ? "justify-end" : "justify-start"}`}>
@@ -80,7 +82,11 @@ function MessageRow({ message, isStreaming, onSelectArtifact, activeArtifactId }
           {isUser ? "You" : "Claude Assistant"}
         </div>
 
-        {/* Conversational bubble */}
+        {/* Conversational bubble — a detected background-job status swaps in
+            its own calm card instead of the generic markdown bubble. */}
+        {jobStatus ? (
+          <BackgroundJobStatus status={jobStatus} />
+        ) : (
         <div
           className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
             isUser
@@ -107,6 +113,7 @@ function MessageRow({ message, isStreaming, onSelectArtifact, activeArtifactId }
             )
           )}
         </div>
+        )}
 
         {/* Inline Artifact Badge (If found) */}
         {artifact && (
