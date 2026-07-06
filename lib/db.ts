@@ -28,10 +28,36 @@ export interface DBArtifactVersion {
   createdAt: string;
 }
 
+export interface DBRemoteAgentJob {
+  id: string;
+  conversationId: string;
+  messageId?: string; // the assistant Message this job is fulfilling, once known
+  userId: string;
+  agentType: string; // "antigravity" | "deep_research" | "deep_research_max"
+  geminiInteractionId: string;
+  status: "queued" | "in_progress" | "requires_action" | "completed" | "failed" | "cancelled";
+  inputSummary: string; // short human-readable description of what was asked, for the sidebar/UI
+  resultJson?: string; // final output payload once completed (Text/Json)
+  errorMessage?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DBWebhookEvent {
+  id: string;
+  webhookId: string; // the webhook-id header value, unique
+  eventType: string;
+  receivedAt: string;
+  processedAt?: string;
+  rawPayload: string;
+}
+
 export interface DBData {
   conversations: DBConversation[];
   messages: DBMessage[];
   artifactVersions: DBArtifactVersion[];
+  jobs: DBRemoteAgentJob[];
+  webhookEvents: DBWebhookEvent[];
 }
 
 const DB_FILE = path.join(process.cwd(), "db.json");
@@ -51,6 +77,8 @@ function loadDB(): DBData {
         conversations: [],
         messages: [],
         artifactVersions: [],
+        jobs: [],
+        webhookEvents: [],
       };
       saveDB(cache);
     }
@@ -60,6 +88,8 @@ function loadDB(): DBData {
       conversations: [],
       messages: [],
       artifactVersions: [],
+      jobs: [],
+      webhookEvents: [],
     };
   }
 
@@ -69,11 +99,15 @@ function loadDB(): DBData {
       conversations: [],
       messages: [],
       artifactVersions: [],
+      jobs: [],
+      webhookEvents: [],
     };
   }
   if (!cache.conversations) cache.conversations = [];
   if (!cache.messages) cache.messages = [];
   if (!cache.artifactVersions) cache.artifactVersions = [];
+  if (!cache.jobs) cache.jobs = [];
+  if (!cache.webhookEvents) cache.webhookEvents = [];
 
   return cache;
 }
@@ -203,6 +237,87 @@ export const db = {
       conversations: [],
       messages: [],
       artifactVersions: [],
+      jobs: [],
+      webhookEvents: [],
     });
+  },
+
+  // Jobs
+  getJob(id: string): DBRemoteAgentJob | undefined {
+    const data = loadDB();
+    return data.jobs.find((j) => j.id === id);
+  },
+
+  getJobByInteractionId(geminiInteractionId: string): DBRemoteAgentJob | undefined {
+    const data = loadDB();
+    return data.jobs.find((j) => j.geminiInteractionId === geminiInteractionId);
+  },
+
+  getJobsForConversation(conversationId: string): DBRemoteAgentJob[] {
+    const data = loadDB();
+    return data.jobs.filter((j) => j.conversationId === conversationId);
+  },
+
+  getPendingJobs(): DBRemoteAgentJob[] {
+    const data = loadDB();
+    return data.jobs.filter((j) => ["queued", "in_progress", "requires_action"].includes(j.status));
+  },
+
+  createJob(conversationId: string, userId: string, agentType: string, geminiInteractionId: string, inputSummary: string): DBRemoteAgentJob {
+    const data = loadDB();
+    const newJob: DBRemoteAgentJob = {
+      id: `job-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      conversationId,
+      userId,
+      agentType,
+      geminiInteractionId,
+      status: "queued",
+      inputSummary,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    data.jobs.push(newJob);
+    saveDB(data);
+    return newJob;
+  },
+
+  updateJob(id: string, updates: Partial<Omit<DBRemoteAgentJob, "id" | "createdAt">>): DBRemoteAgentJob | undefined {
+    const data = loadDB();
+    const job = data.jobs.find((j) => j.id === id);
+    if (job) {
+      Object.assign(job, updates, { updatedAt: new Date().toISOString() });
+      saveDB(data);
+    }
+    return job;
+  },
+
+  // Webhook Events
+  getWebhookEvent(webhookId: string): DBWebhookEvent | undefined {
+    const data = loadDB();
+    return data.webhookEvents.find((e) => e.webhookId === webhookId);
+  },
+
+  createWebhookEvent(webhookId: string, eventType: string, rawPayload: string): DBWebhookEvent {
+    const data = loadDB();
+    const newEvent: DBWebhookEvent = {
+      id: `whe-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      webhookId,
+      eventType,
+      receivedAt: new Date().toISOString(),
+      rawPayload,
+    };
+    data.webhookEvents.push(newEvent);
+    saveDB(data);
+    return newEvent;
+  },
+
+  updateWebhookEvent(webhookId: string, updates: Partial<DBWebhookEvent>): DBWebhookEvent | undefined {
+    const data = loadDB();
+    const event = data.webhookEvents.find((e) => e.webhookId === webhookId);
+    if (event) {
+      Object.assign(event, updates);
+      saveDB(data);
+    }
+    return event;
   }
 };

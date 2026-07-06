@@ -21,6 +21,147 @@ export default function Home() {
   const [activeArtifact, setActiveArtifact] = useState<Artifact | null>(null);
   const [isArtifactPanelOpen, setIsArtifactPanelOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [requiresActionJobId, setRequiresActionJobId] = useState<string | null>(null);
+
+  // Track Background Managed Agent Jobs in real-time (SSE + Polling Fallback)
+  const trackBackgroundJob = (jobId: string, assistantMessageId: string) => {
+    setIsLoading(true);
+    let eventSource: EventSource | null = null;
+    let isTerminated = false;
+    let pollInterval: NodeJS.Timeout | null = null;
+
+    const cleanup = () => {
+      isTerminated = true;
+      if (eventSource) {
+        eventSource.close();
+      }
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+      setRequiresActionJobId((prev) => (prev === jobId ? null : prev));
+      setIsLoading(false);
+    };
+
+    const handleJobUpdate = (data: any) => {
+      if (isTerminated) return;
+
+      console.info("Job status update received:", jobId, data);
+
+      if (data.status === "completed") {
+        const fullOutput = data.result || (data.resultJson ? JSON.parse(data.resultJson).text : "");
+        
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMessageId ? { ...msg, content: fullOutput } : msg
+          )
+        );
+
+        const { artifact } = parseMessageContent(fullOutput);
+        if (artifact) {
+          setActiveArtifact({ ...artifact, isComplete: true });
+          setIsArtifactPanelOpen(true);
+        }
+
+        cleanup();
+      } else if (data.status === "failed") {
+        const errMessage = data.errorMessage || "Remote agent task failed.";
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMessageId
+              ? { ...msg, content: `⚠️ Background task failed: ${errMessage}` }
+              : msg
+          )
+        );
+        cleanup();
+      } else if (data.status === "requires_action") {
+        let actionPayload = data.actionRequired || (data.resultJson ? JSON.parse(data.resultJson) : null);
+        if (typeof actionPayload === "string") {
+          try {
+            actionPayload = JSON.parse(actionPayload);
+          } catch (e) {}
+        }
+        
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMessageId
+              ? {
+                  ...msg,
+                  content: `⚙️ **Action Required**: The remote agent requires your approval or input to proceed.\n\nType: \`${actionPayload?.type || "collaborative_research_checkpoint"}\`\nDescription: \`${actionPayload?.description || "Awaiting research plan confirmation."}\`\n\n*(Type your response below to resume the job)*`,
+                }
+              : msg
+          )
+        );
+        setRequiresActionJobId(jobId);
+        setIsLoading(false);
+      } else {
+        setRequiresActionJobId((prev) => (prev === jobId ? null : prev));
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMessageId
+              ? {
+                  ...msg,
+                  content: `⚙️ [Background Agent: ${data.status || "Executing"}] Running remote operations... please stand by.`,
+                }
+              : msg
+          )
+        );
+      }
+    };
+
+    try {
+      eventSource = new EventSource(`/api/jobs/stream?jobId=${jobId}`);
+      
+      eventSource.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.event === "job_updated" && payload.data) {
+            handleJobUpdate(payload.data);
+          }
+        } catch (e) {
+          console.error("Failed to parse SSE payload", e);
+        }
+      };
+
+      eventSource.onerror = (err) => {
+        console.warn("SSE stream closed or error, starting fallback HTTP polling.");
+        if (eventSource) {
+          eventSource.close();
+        }
+        startPolling();
+      };
+    } catch (e) {
+      console.warn("Failed to initiate EventSource, starting polling fallback.", e);
+      startPolling();
+    }
+
+    const startPolling = () => {
+      if (isTerminated) return;
+      if (pollInterval) clearInterval(pollInterval);
+
+      pollInterval = setInterval(async () => {
+        if (isTerminated) {
+          if (pollInterval) clearInterval(pollInterval);
+          return;
+        }
+
+        try {
+          const res = await fetch(`/api/jobs/${jobId}`);
+          if (res.ok) {
+            const data = await res.json();
+            const job = data.job;
+            if (job) {
+              handleJobUpdate(job);
+              if (["completed", "failed"].includes(job.status)) {
+                cleanup();
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Failed to poll job status:", e);
+        }
+      }, 4000);
+    };
+  };
 
   // 1. Fetch conversations on initial mount
   useEffect(() => {
@@ -54,6 +195,7 @@ export default function Home() {
     setMessages([]);
     setActiveArtifact(null);
     setIsArtifactPanelOpen(false);
+    setRequiresActionJobId(null);
 
     try {
       const res = await fetch(`/api/conversations?id=${id}`);
@@ -83,6 +225,25 @@ export default function Home() {
         if (foundArtifact) {
           setActiveArtifact({ ...foundArtifact, isComplete: true });
           setIsArtifactPanelOpen(true);
+        }
+
+        // Auto-reconnect to any active background jobs for this conversation
+        try {
+          const jobsRes = await fetch(`/api/jobs?conversationId=${id}`);
+          if (jobsRes.ok) {
+            const jobsData = await jobsRes.json();
+            const jobs = jobsData.jobs || [];
+            const activeJobs = jobs.filter((j: any) =>
+              ["queued", "in_progress", "requires_action"].includes(j.status)
+            );
+            for (const activeJob of activeJobs) {
+              if (activeJob.messageId) {
+                trackBackgroundJob(activeJob.id, activeJob.messageId);
+              }
+            }
+          }
+        } catch (jobErr) {
+          console.error("Failed to restore background jobs:", jobErr);
         }
       }
     } catch (err) {
@@ -243,6 +404,14 @@ export default function Home() {
           )
         );
 
+        // Check if a background agent job was initiated
+        const jobStartedMatch = accumulatedText.match(/\[agent_job_started:\s*([^\]]+)\]/);
+        if (jobStartedMatch) {
+          const jobId = jobStartedMatch[1];
+          trackBackgroundJob(jobId, assistantMessageId);
+          break;
+        }
+
         // Parse accumulated text for any artifacts
         const { artifact } = parseMessageContent(accumulatedText);
         if (artifact) {
@@ -285,7 +454,7 @@ export default function Home() {
   };
 
   // 7. Submit user message
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading || !activeConversationId) return;
 
@@ -305,6 +474,41 @@ export default function Home() {
     if (activeConv && activeConv.title === "New Chat") {
       const draftTitle = input.trim().substring(0, 32) + (input.trim().length > 32 ? "..." : "");
       handleUpdateConversation(activeConversationId, { title: draftTitle });
+    }
+
+    if (requiresActionJobId) {
+      setIsLoading(true);
+
+      // Save user message to database manually
+      await fetch("/api/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "saveMessage",
+          conversationId: activeConversationId,
+          message: userMessage,
+        }),
+      });
+
+      try {
+        // Resume the remote agent job
+        const res = await fetch(`/api/jobs/${requiresActionJobId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ input: userMessage.content }),
+        });
+
+        if (res.ok) {
+          setRequiresActionJobId(null);
+        } else {
+          console.error("Failed to resume job:", res.statusText);
+        }
+      } catch (err) {
+        console.error("Error resuming job:", err);
+      } finally {
+        setIsLoading(false);
+      }
+      return;
     }
 
     // Start stream

@@ -113,6 +113,9 @@ export default function Sidebar({
             >
               <option value="gemini-3.5-flash">Gemini 3.5 Flash (Super Fast)</option>
               <option value="gemini-3.5-pro">Gemini 3.5 Pro (Ultra Smart)</option>
+              <option value="antigravity-preview-05-2026">Antigravity Agent (Code & Sandbox)</option>
+              <option value="deep-research-preview-04-2026">Deep Research Agent (Smart Web Engine)</option>
+              <option value="deep-research-max-preview-04-2026">Deep Research Max Agent (Exhaustive Search)</option>
             </select>
             <ChevronDown size={12} className="absolute right-2.5 top-2.5 text-[#8e8e8e] pointer-events-none" />
           </div>

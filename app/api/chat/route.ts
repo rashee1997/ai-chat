@@ -167,6 +167,87 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Check if the selected model is a managed agent
+    const agentModels = [
+      "antigravity-preview-05-2026",
+      "deep-research-preview-04-2026",
+      "deep-research-max-preview-04-2026",
+    ];
+    const isAgent = agentModels.includes(model);
+
+    if (isAgent) {
+      const host = req.headers.get("host") || "localhost:3000";
+      const protocol = req.headers.get("x-forwarded-proto") || "http";
+      const finalProtocol =
+        host.includes("localhost") || host.includes("127.0.0.1") ? protocol : "https";
+      const baseUrl = `${finalProtocol}://${host}`;
+      const webhookUri = `${baseUrl}/api/webhooks/gemini`;
+
+      const lastMsg = messages[messages.length - 1];
+      const userPrompt = lastMsg?.content || "";
+
+      const ai = new GoogleGenAI({
+        apiKey: process.env.GEMINI_API_KEY,
+        httpOptions: {
+          headers: {
+            "User-Agent": "aistudio-build",
+          },
+        },
+      });
+
+      // Create a background interaction using the remote environment
+      const initialInteraction = await ai.interactions.create({
+        agent: model,
+        input: userPrompt,
+        environment: "remote",
+        background: true,
+        config: {
+          webhookConfig: {
+            uris: [webhookUri],
+          },
+        },
+      });
+
+      // Create a remote agent job in our local DB
+      const job = db.createJob(
+        conversationId,
+        "default-user",
+        model,
+        initialInteraction.id,
+        userPrompt.substring(0, 120)
+      );
+
+      // Create initial assistant message and link message ID to the job
+      const assistantMessageId = `assistant-${Date.now()}`;
+      const initialAssistantContent = `⚙️ [agent_job_started: ${job.id}] Remote background agent task initiated. Please wait while the ${
+        model === "antigravity-preview-05-2026" ? "Antigravity" : "Deep Research"
+      } agent executes the task...`;
+
+      db.updateJob(job.id, { messageId: assistantMessageId });
+      db.saveMessage(conversationId, {
+        id: assistantMessageId,
+        role: "assistant",
+        content: initialAssistantContent,
+      });
+
+      // Stream the response back so the UI gets it instantly
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(initialAssistantContent));
+          controller.close();
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+        },
+      });
+    }
+
     const ai = new GoogleGenAI({
       apiKey: process.env.GEMINI_API_KEY,
       httpOptions: {

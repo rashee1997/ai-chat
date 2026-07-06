@@ -67,6 +67,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
+    if (action === "saveMessage") {
+      const { conversationId, message } = body;
+      if (!conversationId || !message) {
+        return NextResponse.json({ error: "Missing conversationId or message" }, { status: 400 });
+      }
+      db.saveMessage(conversationId, message);
+      return NextResponse.json({ success: true });
+    }
+
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   } catch (error: any) {
     console.error("POST Conversations Error:", error);
