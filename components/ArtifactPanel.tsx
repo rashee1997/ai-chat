@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, History, ChevronLeft, ChevronRight, Check, RefreshCw } from "lucide-react";
+import { X, History, ChevronLeft, ChevronRight, Check, RefreshCw, GitCompare } from "lucide-react";
 import { Artifact } from "@/lib/types";
 import HTMLArtifact from "./HTMLArtifact";
 import WordArtifact from "./WordArtifact";
@@ -9,6 +9,7 @@ import PPTArtifact from "./PPTArtifact";
 import ExcelArtifact from "./ExcelArtifact";
 import SVGArtifact from "./SVGArtifact";
 import MermaidArtifact from "./MermaidArtifact";
+import VisualDiff from "./VisualDiff";
 
 interface ArtifactPanelProps {
   artifact: Artifact | null;
@@ -25,6 +26,7 @@ export default function ArtifactPanel({
   const [selectedVersion, setSelectedVersion] = useState<any | null>(null);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [restoredVersionNumber, setRestoredVersionNumber] = useState<number | null>(null);
+  const [showDiff, setShowDiff] = useState(false);
 
   // Fetch all saved versions of this artifact whenever it loads or changes
   useEffect(() => {
@@ -35,7 +37,33 @@ export default function ArtifactPanel({
         const res = await fetch(`/api/artifacts/versions?artifactId=${artifact.id}`);
         if (res.ok) {
           const data = await res.json();
-          setVersions(data.versions || []);
+          let currentVersions = data.versions || [];
+
+          // If there are no saved versions yet, save the original unedited state right away as Version 1
+          if (currentVersions.length === 0 && artifact.content) {
+            try {
+              const saveRes = await fetch("/api/artifacts/versions", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  artifactId: artifact.id,
+                  content: artifact.content,
+                  type: artifact.type,
+                  title: artifact.title,
+                }),
+              });
+              if (saveRes.ok) {
+                const saveData = await saveRes.json();
+                if (saveData.version) {
+                  currentVersions = [saveData.version];
+                }
+              }
+            } catch (saveErr) {
+              console.error("Failed to auto-save original version:", saveErr);
+            }
+          }
+
+          setVersions(currentVersions);
         }
       } catch (err) {
         console.error("Failed to load versions:", err);
@@ -46,6 +74,7 @@ export default function ArtifactPanel({
     setTimeout(() => {
       setSelectedVersion(null);
       setRestoredVersionNumber(null);
+      setShowDiff(false);
     }, 0);
   }, [artifact]);
 
@@ -137,6 +166,20 @@ export default function ArtifactPanel({
             {artifact.type}
           </span>
 
+          {/* Visual Diff Toggle Button */}
+          <button
+            onClick={() => setShowDiff(!showDiff)}
+            className={`flex items-center space-x-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${
+              showDiff
+                ? "bg-emerald-50 text-emerald-700 border-emerald-200 shadow-sm"
+                : "bg-white text-slate-700 border-[#e0e0e0] hover:bg-[#f9f9f8]"
+            }`}
+            title="Compare with original AI-generated version"
+          >
+            <GitCompare size={13} className={showDiff ? "text-emerald-600" : "text-slate-500"} />
+            <span className="hidden sm:inline">Visual Diff</span>
+          </button>
+
           {/* Version History Toggle Button */}
           <button
             onClick={() => setShowVersionHistory(!showVersionHistory)}
@@ -189,53 +232,64 @@ export default function ArtifactPanel({
           )}
 
           <div className="flex-1 overflow-hidden relative">
-            {artifact.type === "html" && (
-              <HTMLArtifact
-                content={activeContent}
+            {showDiff ? (
+              <VisualDiff
+                oldContent={versions[0]?.content || ""}
+                newContent={activeContent}
                 title={artifact.title}
-                id={artifact.id}
-                onContentChange={isViewingHistory ? () => {} : handleLocalContentChange}
+                type={artifact.type}
               />
-            )}
-            {artifact.type === "word" && (
-              <WordArtifact
-                content={activeContent}
-                title={artifact.title}
-                id={artifact.id}
-                onContentChange={isViewingHistory ? () => {} : handleLocalContentChange}
-              />
-            )}
-            {artifact.type === "ppt" && (
-              <PPTArtifact
-                content={activeContent}
-                title={artifact.title}
-                id={artifact.id}
-                onContentChange={isViewingHistory ? () => {} : handleLocalContentChange}
-              />
-            )}
-            {artifact.type === "excel" && (
-              <ExcelArtifact
-                content={activeContent}
-                title={artifact.title}
-                id={artifact.id}
-                onContentChange={isViewingHistory ? () => {} : handleLocalContentChange}
-              />
-            )}
-            {artifact.type === "svg" && (
-              <SVGArtifact
-                content={activeContent}
-                title={artifact.title}
-                id={artifact.id}
-                onContentChange={isViewingHistory ? () => {} : handleLocalContentChange}
-              />
-            )}
-            {artifact.type === "mermaid" && (
-              <MermaidArtifact
-                content={activeContent}
-                title={artifact.title}
-                id={artifact.id}
-                onContentChange={isViewingHistory ? () => {} : handleLocalContentChange}
-              />
+            ) : (
+              <>
+                {artifact.type === "html" && (
+                  <HTMLArtifact
+                    content={activeContent}
+                    title={artifact.title}
+                    id={artifact.id}
+                    onContentChange={isViewingHistory ? () => {} : handleLocalContentChange}
+                  />
+                )}
+                {artifact.type === "word" && (
+                  <WordArtifact
+                    content={activeContent}
+                    title={artifact.title}
+                    id={artifact.id}
+                    onContentChange={isViewingHistory ? () => {} : handleLocalContentChange}
+                  />
+                )}
+                {artifact.type === "ppt" && (
+                  <PPTArtifact
+                    content={activeContent}
+                    title={artifact.title}
+                    id={artifact.id}
+                    onContentChange={isViewingHistory ? () => {} : handleLocalContentChange}
+                  />
+                )}
+                {artifact.type === "excel" && (
+                  <ExcelArtifact
+                    content={activeContent}
+                    title={artifact.title}
+                    id={artifact.id}
+                    onContentChange={isViewingHistory ? () => {} : handleLocalContentChange}
+                  />
+                )}
+                {artifact.type === "svg" && (
+                  <SVGArtifact
+                    content={activeContent}
+                    title={artifact.title}
+                    id={artifact.id}
+                    onContentChange={isViewingHistory ? () => {} : handleLocalContentChange}
+                  />
+                )}
+                {artifact.type === "mermaid" && (
+                  <MermaidArtifact
+                    content={activeContent}
+                    title={artifact.title}
+                    id={artifact.id}
+                    onContentChange={isViewingHistory ? () => {} : handleLocalContentChange}
+                  />
+                )}
+              </>
             )}
           </div>
         </div>
