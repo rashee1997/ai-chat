@@ -8,7 +8,13 @@ import ArtifactPanel from "@/components/ArtifactPanel";
 import ThemeToggle from "@/components/ThemeToggle";
 import { Message, Artifact } from "@/lib/types";
 import { parseMessageContent } from "@/lib/parser";
+import {
+  formatBackgroundJobRunning,
+  formatBackgroundJobActionRequired,
+  formatBackgroundJobFailed,
+} from "@/lib/backgroundJobMessages";
 import { DBConversation } from "@/lib/db";
+import { isBelowLgBreakpoint } from "@/lib/breakpoints";
 
 export default function Home() {
   const [conversations, setConversations] = useState<DBConversation[]>([]);
@@ -69,7 +75,7 @@ export default function Home() {
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === assistantMessageId
-              ? { ...msg, content: `⚠️ Background task failed: ${errMessage}` }
+              ? { ...msg, content: formatBackgroundJobFailed(errMessage) }
               : msg
           )
         );
@@ -87,7 +93,10 @@ export default function Home() {
             msg.id === assistantMessageId
               ? {
                   ...msg,
-                  content: `⚙️ **Action Required**: The remote agent requires your approval or input to proceed.\n\nType: \`${actionPayload?.type || "collaborative_research_checkpoint"}\`\nDescription: \`${actionPayload?.description || "Awaiting research plan confirmation."}\`\n\n*(Type your response below to resume the job)*`,
+                  content: formatBackgroundJobActionRequired(
+                    actionPayload?.type || "collaborative_research_checkpoint",
+                    actionPayload?.description || "Awaiting research plan confirmation."
+                  ),
                 }
               : msg
           )
@@ -101,7 +110,7 @@ export default function Home() {
             msg.id === assistantMessageId
               ? {
                   ...msg,
-                  content: `⚙️ [Background Agent: ${data.status || "Executing"}] Running remote operations... please stand by.`,
+                  content: formatBackgroundJobRunning(data.status || "Executing"),
                 }
               : msg
           )
@@ -199,7 +208,7 @@ export default function Home() {
         requestAnimationFrame(() => {
           document.getElementById("conversation-search")?.focus();
         });
-      } else if (e.key === "Escape" && window.innerWidth < 1024) {
+      } else if (e.key === "Escape" && isBelowLgBreakpoint()) {
         setIsSidebarOpen(false);
       }
     };
@@ -211,7 +220,7 @@ export default function Home() {
   // `lg` it renders as an overlay drawer — correct that on mount so a phone
   // doesn't load with the drawer already covering the screen.
   useEffect(() => {
-    if (window.innerWidth < 1024) {
+    if (isBelowLgBreakpoint()) {
       setIsSidebarOpen(false);
     }
   }, []);
@@ -602,7 +611,7 @@ export default function Home() {
   // Below the `lg` breakpoint the sidebar is an overlay drawer, not a
   // persistent column, so picking a conversation should close it again.
   const closeSidebarOnMobile = () => {
-    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+    if (isBelowLgBreakpoint()) {
       setIsSidebarOpen(false);
     }
   };

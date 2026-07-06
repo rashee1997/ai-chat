@@ -64,7 +64,7 @@ interface MessageRowProps {
 function MessageRow({ message, isStreaming, onSelectArtifact, activeArtifactId }: MessageRowProps) {
   const isUser = message.role === "user";
   const { conversationalText, artifact } = parseMessageContent(message.content);
-  const jobStatus = !isUser ? parseBackgroundJobStatus(conversationalText) : null;
+  const jobStatus = !isUser && conversationalText ? parseBackgroundJobStatus(conversationalText) : null;
 
   return (
     <div className={`flex space-x-4 ${isUser ? "justify-end" : "justify-start"}`}>

@@ -53,11 +53,15 @@ export default function Sidebar({
 
   // Restore a remembered width (desktop-only resizing; see the drag handle below).
   useEffect(() => {
-    const stored = localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
-    const parsed = stored ? parseInt(stored, 10) : NaN;
-    if (!Number.isNaN(parsed)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of a value persisted outside React (localStorage)
-      setWidth(Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, parsed)));
+    try {
+      const stored = localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
+      const parsed = stored ? parseInt(stored, 10) : NaN;
+      if (!Number.isNaN(parsed)) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of a value persisted outside React (localStorage)
+        setWidth(Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, parsed)));
+      }
+    } catch {
+      // Storage may be unavailable (private mode); fall back to the default width.
     }
   }, []);
 
@@ -72,7 +76,11 @@ export default function Sidebar({
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
       setWidth((w) => {
-        localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(w));
+        try {
+          localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(w));
+        } catch {
+          // Storage may be unavailable (private mode); resizing still works for this tab.
+        }
         return w;
       });
     };
