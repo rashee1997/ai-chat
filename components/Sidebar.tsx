@@ -138,8 +138,11 @@ export default function Sidebar({
       className="relative flex-shrink-0 border-r border-border bg-surface-sunken h-full flex flex-col select-none"
       id="app-sidebar"
     >
-      {/* Top Section: App Title & Model Selection */}
-      <div className="p-4 border-b border-border flex flex-col space-y-3" id="sidebar-header">
+      {/* App Title — fixed to the same height as the main app header so the
+          border line between sidebar and content runs continuously instead
+          of stepping, which is what made the sidebar read as a separate,
+          disconnected panel rather than part of one layout. */}
+      <div className="h-14 flex-shrink-0 px-3 border-b border-border flex items-center" id="sidebar-header">
         <div className="flex items-center space-x-2.5">
           <div className="flex items-center justify-center w-7 h-7 rounded bg-primary text-on-primary shadow-sm">
             <Sparkles size={14} />
@@ -148,27 +151,27 @@ export default function Sidebar({
             Artifact Studio
           </span>
         </div>
+      </div>
 
-        {/* Dynamic Model Dropdown */}
-        <div className="relative" id="model-dropdown-container">
-          <label className="text-[10px] text-on-surface-muted uppercase font-bold tracking-wider block mb-1">
-            Active Intelligence
-          </label>
-          <div className="relative">
-            <select
-              value={selectedModel}
-              onChange={(e) => onModelChange(e.target.value)}
-              className="w-full bg-surface-raised hover:bg-surface-sunken border border-border rounded-xl px-3 py-1.5 pr-8 text-xs font-semibold text-on-surface appearance-none focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer transition-all shadow-sm"
-              id="model-selector-dropdown"
-            >
-              <option value="gemini-3.5-flash">Gemini 3.5 Flash (Super Fast)</option>
-              <option value="gemini-3.5-pro">Gemini 3.5 Pro (Ultra Smart)</option>
-              <option value="antigravity-preview-05-2026">Antigravity Agent (Code & Sandbox)</option>
-              <option value="deep-research-preview-04-2026">Deep Research Agent (Smart Web Engine)</option>
-              <option value="deep-research-max-preview-04-2026">Deep Research Max Agent (Exhaustive Search)</option>
-            </select>
-            <ChevronDown size={12} className="absolute right-2.5 top-2.5 text-on-surface-muted pointer-events-none" />
-          </div>
+      {/* Model Selection */}
+      <div className="p-3 border-b border-border" id="model-dropdown-container">
+        <label className="text-[10px] text-on-surface-muted uppercase font-bold tracking-wider block mb-1">
+          Active Intelligence
+        </label>
+        <div className="relative">
+          <select
+            value={selectedModel}
+            onChange={(e) => onModelChange(e.target.value)}
+            className="w-full bg-surface-raised hover:bg-surface-sunken border border-border rounded-xl px-3 py-1.5 pr-8 text-xs font-semibold text-on-surface appearance-none focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer transition-all shadow-sm"
+            id="model-selector-dropdown"
+          >
+            <option value="gemini-3.5-flash">Gemini 3.5 Flash (Super Fast)</option>
+            <option value="gemini-3.5-pro">Gemini 3.5 Pro (Ultra Smart)</option>
+            <option value="antigravity-preview-05-2026">Antigravity Agent (Code & Sandbox)</option>
+            <option value="deep-research-preview-04-2026">Deep Research Agent (Smart Web Engine)</option>
+            <option value="deep-research-max-preview-04-2026">Deep Research Max Agent (Exhaustive Search)</option>
+          </select>
+          <ChevronDown size={12} className="absolute right-2.5 top-2.5 text-on-surface-muted pointer-events-none" />
         </div>
       </div>
 

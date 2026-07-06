@@ -647,7 +647,7 @@ export default function Home() {
       {/* 2. Main Content Layout Area */}
       <div className="flex-1 flex flex-col min-w-0" id="main-layout-container">
         {/* Universal Top Navigation Header */}
-        <header className="bg-surface-raised border-b border-border px-6 py-3.5 flex items-center justify-between shadow-[var(--shadow-sm)] z-15 select-none" id="main-header">
+        <header className="h-14 flex-shrink-0 bg-surface-raised border-b border-border px-6 flex items-center justify-between shadow-[var(--shadow-sm)] z-15 select-none" id="main-header">
           <div className="flex items-center space-x-3">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
