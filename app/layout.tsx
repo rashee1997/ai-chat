@@ -13,7 +13,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: 'Claude Artifact Studio',
+  title: 'Artifact Studio AI',
   description: 'An interactive AI Chat with real-time streaming artifacts for HTML web apps, Word docs, PowerPoint slides, and Excel sheets.',
 };
 

@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { X, History, ChevronLeft, ChevronRight, Check, RefreshCw, GitCompare } from "lucide-react";
+import dynamic from "next/dynamic";
+import { X, History, ChevronLeft, ChevronRight, Check, RefreshCw, GitCompare, Loader2 } from "lucide-react";
 import { Artifact } from "@/lib/types";
 import HTMLArtifact from "./HTMLArtifact";
 import WordArtifact from "./WordArtifact";
@@ -10,6 +11,18 @@ import ExcelArtifact from "./ExcelArtifact";
 import SVGArtifact from "./SVGArtifact";
 import MermaidArtifact from "./MermaidArtifact";
 import VisualDiff from "./VisualDiff";
+
+// Sandpack (~700KB) is only needed when a "react" artifact is actually
+// opened — load it on demand instead of bloating every page's bundle.
+const ReactArtifact = dynamic(() => import("./ReactArtifact"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex flex-col h-full items-center justify-center bg-surface-sunken rounded-xl border border-border gap-3 text-on-surface-muted">
+      <Loader2 size={20} className="animate-spin text-primary" />
+      <span className="text-xs font-medium">Loading React workspace…</span>
+    </div>
+  ),
+});
 
 interface ArtifactPanelProps {
   artifact: Artifact | null;
@@ -171,6 +184,7 @@ export default function ArtifactPanel({
             artifact.type === "ppt" ? "bg-orange-50 text-orange-600" :
             artifact.type === "svg" ? "bg-purple-50 text-purple-600" :
             artifact.type === "mermaid" ? "bg-indigo-50 text-indigo-600" :
+            artifact.type === "react" ? "bg-sky-50 text-sky-600" :
             "bg-success-surface text-success"
           }`}>
             <span className="material-symbols-outlined text-sm font-bold block leading-none">
@@ -179,6 +193,7 @@ export default function ArtifactPanel({
                artifact.type === "ppt" ? "present_to_all" :
                artifact.type === "svg" ? "image" :
                artifact.type === "mermaid" ? "git_branch" :
+               artifact.type === "react" ? "code_blocks" :
                "terminal"}
             </span>
           </div>
@@ -321,6 +336,14 @@ export default function ArtifactPanel({
                 )}
                 {artifact.type === "mermaid" && (
                   <MermaidArtifact
+                    content={activeContent}
+                    title={artifact.title}
+                    id={artifact.id}
+                    onContentChange={isViewingHistory ? () => {} : handleLocalContentChange}
+                  />
+                )}
+                {artifact.type === "react" && (
+                  <ReactArtifact
                     content={activeContent}
                     title={artifact.title}
                     id={artifact.id}

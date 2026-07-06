@@ -8,16 +8,16 @@ export async function GET(req: NextRequest) {
 
     if (id) {
       // Fetch messages for a specific conversation
-      const conversation = db.getConversation(id);
+      const conversation = await db.getConversation(id);
       if (!conversation) {
         return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
       }
-      const messages = db.getMessages(id);
+      const messages = await db.getMessages(id);
       return NextResponse.json({ conversation, messages });
     }
 
     // List all conversations
-    const list = db.getConversations();
+    const list = await db.getConversations();
     return NextResponse.json({ conversations: list });
   } catch (error: any) {
     console.error("GET Conversations Error:", error);
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       if (!id || !title) {
         return NextResponse.json({ error: "Missing id or title for creation" }, { status: 400 });
       }
-      const conv = db.createConversation(id, title, model);
+      const conv = await db.createConversation(id, title, model);
       return NextResponse.json({ conversation: conv });
     }
 
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
       if (pinned !== undefined) updates.pinned = pinned;
       if (model !== undefined) updates.model = model;
 
-      const conv = db.updateConversation(id, updates);
+      const conv = await db.updateConversation(id, updates);
       if (!conv) {
         return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
       }
@@ -58,12 +58,12 @@ export async function POST(req: NextRequest) {
       if (!id) {
         return NextResponse.json({ error: "Missing id for deletion" }, { status: 400 });
       }
-      db.deleteConversation(id);
+      await db.deleteConversation(id);
       return NextResponse.json({ success: true });
     }
 
     if (action === "clear") {
-      db.clearAll();
+      await db.clearAll();
       return NextResponse.json({ success: true });
     }
 
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
       if (!conversationId || !message) {
         return NextResponse.json({ error: "Missing conversationId or message" }, { status: 400 });
       }
-      db.saveMessage(conversationId, message);
+      await db.saveMessage(conversationId, message);
       return NextResponse.json({ success: true });
     }
 

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { verifyWebhook } from "@/lib/signature";
-import { pubsub } from "@/lib/pubsub";
 import { GoogleGenAI } from "@google/genai";
 import { parseMessageContent } from "@/lib/parser";
 
@@ -33,14 +32,14 @@ export async function POST(req: NextRequest) {
     const eventType = payload.event_type || payload.eventType || "unknown";
 
     // 3. Idempotency Check
-    const existingEvent = db.getWebhookEvent(finalWebhookId);
+    const existingEvent = await db.getWebhookEvent(finalWebhookId);
     if (existingEvent) {
       console.info("Duplicate Webhook Event Ignored:", finalWebhookId);
       return NextResponse.json({ received: true, duplicate: true }, { status: 200 });
     }
 
     // Save event
-    db.createWebhookEvent(finalWebhookId, eventType, rawBody);
+    await db.createWebhookEvent(finalWebhookId, eventType, rawBody);
 
     // 4. Return 200 OK immediately and process asynchronously (non-blocking)
     processWebhookEvent(eventType, payload, finalWebhookId).catch((err) => {
@@ -58,15 +57,15 @@ async function processWebhookEvent(eventType: string, payload: any, webhookId: s
   const interactionId = payload.interaction?.id || payload.interactionId;
   if (!interactionId) {
     console.warn("No interaction ID found in webhook payload:", payload);
-    db.updateWebhookEvent(webhookId, { processedAt: new Date().toISOString() });
+    await db.updateWebhookEvent(webhookId, { processedAt: new Date().toISOString() });
     return;
   }
 
   // Find corresponding job by geminiInteractionId
-  const job = db.getJobByInteractionId(interactionId);
+  const job = await db.getJobByInteractionId(interactionId);
   if (!job) {
     console.warn("No RemoteAgentJob found for interaction ID:", interactionId);
-    db.updateWebhookEvent(webhookId, { processedAt: new Date().toISOString() });
+    await db.updateWebhookEvent(webhookId, { processedAt: new Date().toISOString() });
     return;
   }
 
@@ -105,7 +104,7 @@ async function processWebhookEvent(eventType: string, payload: any, webhookId: s
 
       // Save assistant message in conversation
       const messageId = job.messageId || `assistant-${Date.now()}`;
-      db.saveMessage(job.conversationId, {
+      await db.saveMessage(job.conversationId, {
         id: messageId,
         role: "assistant",
         content: fullOutput,
@@ -114,85 +113,53 @@ async function processWebhookEvent(eventType: string, payload: any, webhookId: s
       // Save any artifacts parsed
       const { artifact } = parseMessageContent(fullOutput);
       if (artifact) {
-        db.saveArtifactVersion(artifact.id, {
+        await db.saveArtifactVersion(artifact.id, {
           content: artifact.content,
           type: artifact.type,
           title: artifact.title,
         });
       }
 
-      // Update Job status in DB
-      db.updateJob(job.id, {
+      // Update Job status in DB — /api/jobs/stream picks this up by polling,
+      // and the client-side polling fallback picks it up via GET /api/jobs/:id.
+      await db.updateJob(job.id, {
         status: "completed",
         messageId,
         resultJson: JSON.stringify({ text: fullOutput }),
       });
-
-      // Notify clients
-      pubsub.publish(job.id, {
-        jobId: job.id,
-        conversationId: job.conversationId,
-        status: "completed",
-        messageId,
-        result: fullOutput,
-      });
-
     } else if (eventType === "interaction.failed" || payload.interaction?.status === "failed") {
       const errorMessage = payload.interaction?.error?.message || "Interaction failed during remote agent execution.";
       console.warn(`Processing failed interaction: ${interactionId} for Job ${job.id}. Error: ${errorMessage}`);
 
-      db.updateJob(job.id, {
+      await db.updateJob(job.id, {
         status: "failed",
         errorMessage,
       });
 
       // Save a failure message in conversation so user knows what went wrong
       const messageId = job.messageId || `assistant-${Date.now()}`;
-      db.saveMessage(job.conversationId, {
+      await db.saveMessage(job.conversationId, {
         id: messageId,
         role: "assistant",
         content: `⚠️ Background task failed: ${errorMessage}`,
       });
-
-      pubsub.publish(job.id, {
-        jobId: job.id,
-        conversationId: job.conversationId,
-        status: "failed",
-        messageId,
-        errorMessage,
-      });
-
     } else if (eventType === "interaction.requires_action" || payload.interaction?.status === "requires_action") {
       console.info(`Processing requires_action interaction: ${interactionId} for Job ${job.id}`);
 
       const actionPayload = payload.interaction?.requires_action || null;
 
-      db.updateJob(job.id, {
+      await db.updateJob(job.id, {
         status: "requires_action",
         resultJson: actionPayload ? JSON.stringify(actionPayload) : undefined,
       });
-
-      pubsub.publish(job.id, {
-        jobId: job.id,
-        conversationId: job.conversationId,
-        status: "requires_action",
-        actionRequired: actionPayload,
-      });
     }
 
-    db.updateWebhookEvent(webhookId, { processedAt: new Date().toISOString() });
+    await db.updateWebhookEvent(webhookId, { processedAt: new Date().toISOString() });
   } catch (err: any) {
     console.error(`Error processing webhook event for Job ${job.id}:`, err);
-    db.updateJob(job.id, {
+    await db.updateJob(job.id, {
       status: "failed",
       errorMessage: `Error processing webhook callback: ${err.message}`,
-    });
-
-    pubsub.publish(job.id, {
-      jobId: job.id,
-      conversationId: job.conversationId,
-      status: "failed",
-      errorMessage: err.message,
     });
   }
 }

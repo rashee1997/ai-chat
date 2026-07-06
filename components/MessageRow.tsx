@@ -10,6 +10,7 @@ import {
   Loader2,
   Image as ImageIcon,
   GitBranch,
+  Component,
 } from "lucide-react";
 import { Message, Artifact } from "@/lib/types";
 import { parseMessageContent, parseBackgroundJobStatus } from "@/lib/parser";
@@ -30,6 +31,8 @@ function getArtifactIcon(type: string) {
       return <ImageIcon size={18} className="text-purple-500" />;
     case "mermaid":
       return <GitBranch size={18} className="text-indigo-500" />;
+    case "react":
+      return <Component size={18} className="text-sky-500" />;
     default:
       return <FileText size={18} className="text-on-surface-muted" />;
   }
@@ -49,6 +52,8 @@ function getArtifactTypeName(type: string) {
       return "SVG Vector Graphic";
     case "mermaid":
       return "Mermaid Graphic Diagram";
+    case "react":
+      return "React Project Workspace";
     default:
       return "Artifact Document";
   }
@@ -79,7 +84,7 @@ function MessageRow({ message, isStreaming, onSelectArtifact, activeArtifactId }
       <div className={`max-w-[85%] space-y-2 ${isUser ? "text-right" : "text-left"}`}>
         {/* Username indicator */}
         <div className="text-[10px] text-on-surface-muted font-semibold uppercase tracking-wider select-none">
-          {isUser ? "You" : "Claude Assistant"}
+          {isUser ? "You" : "Assistant"}
         </div>
 
         {/* Conversational bubble — a detected background-job status swaps in
@@ -139,6 +144,8 @@ function MessageRow({ message, isStreaming, onSelectArtifact, activeArtifactId }
                     ? "bg-purple-50 text-purple-600"
                     : artifact.type === "mermaid"
                     ? "bg-indigo-50 text-indigo-600"
+                    : artifact.type === "react"
+                    ? "bg-sky-50 text-sky-600"
                     : "bg-green-50 text-green-600"
                 }`}
               >

@@ -222,7 +222,7 @@ export default function ChatPanel({
 
             <div className="space-y-3">
               <h1 className="font-sans font-bold text-2xl text-on-surface tracking-tight leading-none">
-                Claude Artifact Studio
+                Artifact Studio AI
               </h1>
               <p className="text-xs text-on-surface-muted leading-relaxed max-w-sm">
                 Generate and edit stunning interactive codebases, spreadsheets, PowerPoint presentations, vector images, and diagram charts instantly.
@@ -317,7 +317,7 @@ export default function ChatPanel({
                 </div>
                 <div className="space-y-2 w-full">
                   <div className="text-[10px] text-on-surface-muted font-semibold uppercase tracking-wider select-none">
-                    Claude Assistant
+                    Assistant
                   </div>
                   <div className="px-4 py-3 bg-surface-raised border border-border rounded-2xl shadow-sm max-w-sm flex items-center space-x-2">
                     <Loader2 size={14} className="animate-spin text-on-surface-muted" />

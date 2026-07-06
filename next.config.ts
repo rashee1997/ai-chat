@@ -19,8 +19,40 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  output: 'standalone',
+  // 'standalone' bundles a self-contained server for non-Vercel Node/Docker
+  // hosting (e.g. AI Studio's own container). Vercel has its own build
+  // output pipeline and doesn't need or want this — it's harmless to leave
+  // on, but skipping it there avoids producing a redundant standalone
+  // bundle on every deploy.
+  output: process.env.VERCEL ? undefined : 'standalone',
   transpilePackages: ['motion'],
+  async headers() {
+    // The "react" artifact workspace (components/ReactArtifact.tsx) renders
+    // its live preview via @codesandbox/sandpack-react, which navigates an
+    // iframe to a versioned "<version>-sandpack.codesandbox.io" subdomain,
+    // talks to "prod-packager-packages.codesandbox.io" to resolve npm
+    // dependencies, and posts to "codesandbox.io/api/v1/sandboxes/define"
+    // for the "Open in CodeSandbox" export action. This only widens those
+    // three directives to allow that traffic; every other directive is left
+    // unset (fully permissive, matching current behavior) so it doesn't
+    // newly restrict anything else the app already does (AI-generated HTML
+    // artifacts loading arbitrary CDN scripts/fonts, blob/data URL exports).
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "frame-src 'self' https://*.codesandbox.io",
+              "connect-src 'self' https://*.codesandbox.io https://codesandbox.io",
+              "form-action 'self' https://codesandbox.io",
+            ].join('; '),
+          },
+        ],
+      },
+    ];
+  },
   webpack: (config, {dev, isServer, webpack}) => {
     // HMR is disabled in AI Studio via DISABLE_HMR env var.
     // File watching is disabled to prevent flickering during agent edits.

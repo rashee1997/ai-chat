@@ -1,4 +1,4 @@
-# Design Brief — Claude Artifact Studio
+# Design Brief — Artifact Studio AI
 
 > Living document. Update this file when a visual decision repeats (a new
 > button style, alert pattern, or spacing choice shows up more than once) —
@@ -155,3 +155,56 @@ rehype pipeline. Its internal chrome (code block header, copy/zoom controls)
 uses shadcn-style class names (`bg-background`, `text-muted-foreground`,
 etc.); those are aliased to the tokens above so it re-themes with the rest of
 the app instead of shipping its own look.
+
+## React artifact workspace (Sandpack)
+
+The "react" artifact type is a multi-file project (`{ files, dependencies,
+entry }`, validated with zod in `lib/reactArtifact.ts`) rendered live via
+`@codesandbox/sandpack-react`'s granular building blocks
+(`SandpackProvider`/`SandpackLayout`/`SandpackFileExplorer`/
+`SandpackCodeEditor`/`SandpackPreview`), not its one-line `<Sandpack />`
+preset — that's what lets the workspace chrome (file tree, toolbar, device
+preview frame) consume this app's own design tokens instead of Sandpack's
+default look.
+
+**Maintenance risk (accepted tradeoff, recorded deliberately):** CodeSandbox
+announced `@codesandbox/sandpack-react` is no longer actively maintained. It
+remains the most capable lightweight in-browser bundler available (small
+bundle size vs. Monaco/full-IDE alternatives, zero server infra, real npm
+dependency resolution, hot reload), so it's still the pragmatic choice — but
+both `@codesandbox/sandpack-react` and `@codesandbox/sandpack-themes` are
+pinned to an **exact** version in `package.json` (no `^`/`~`), so an upstream
+change can never surprise-break the workspace on a routine `npm install`.
+Bump the pin deliberately, re-test the workspace, and update this note.
+If a future React major version (or bundler incompatibility) ever appears
+with no upstream fix, the recorded fallback to evaluate is **StackBlitz
+WebContainers** — a heavier but actively maintained alternative.
+
+**License note (transitive dependency, recorded deliberately):**
+`@codesandbox/sandpack-client` (a dependency of `sandpack-react`) pulls in
+`@codesandbox/nodebox`, which is licensed under CodeSandbox's own
+"Sustainable Use License" — a source-available, non-OSI-approved license
+that restricts use to internal/non-commercial purposes and free
+redistribution only. `nodebox` is `sandpack-client`'s in-browser Node.js
+runtime, used only by its `"node"` environment/template — this app only
+ever instantiates `template="react"` (see `components/ReactArtifact.tsx`),
+and `sandpack-client` loads the node client via a runtime-gated dynamic
+`require()`, so that code path is never reached and is very likely never
+even fetched as a chunk. It's still a transitive dependency present in
+`package-lock.json` (a supply-chain fact regardless of runtime reachability)
+and can't be removed without patching `sandpack-client` itself, which is
+pinned to an exact version specifically so this doesn't shift silently on
+an unrelated `npm install`. Flagged here so it's a recorded, deliberate
+tradeoff rather than a silent gap — revisit if `sandpack-client` ever makes
+`nodebox` a hard (non-lazy) dependency.
+
+The live preview iframe runs on CodeSandbox's own sandboxed subdomain by
+design (isolates model/user-written code from this app's cookies/
+localStorage) — this is a different, complementary boundary from the
+server-side `code_execution` tool used elsewhere for agent reasoning; the
+two must never share a trust boundary or code path.
+
+Dependencies the model may request for a react artifact are restricted to a
+curated allow-list (`ALLOWED_REACT_DEPENDENCIES` in `lib/reactArtifact.ts`)
+rather than resolved from npm sight-unseen — anything off the list is
+stripped before the project runs.
