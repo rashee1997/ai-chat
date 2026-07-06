@@ -5,14 +5,14 @@ export interface Message {
   timestamp: Date;
   artifact?: {
     id: string;
-    type: "html" | "word" | "ppt" | "excel";
+    type: "html" | "word" | "ppt" | "excel" | "svg" | "mermaid";
     title: string;
   };
 }
 
 export interface Artifact {
   id: string;
-  type: "html" | "word" | "ppt" | "excel";
+  type: "html" | "word" | "ppt" | "excel" | "svg" | "mermaid";
   title: string;
   content: string;
   isComplete: boolean;

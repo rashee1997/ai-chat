@@ -1,23 +1,196 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Sparkles, HelpCircle, Layers, SidebarClose, Info, RefreshCw } from "lucide-react";
+import { Sparkles, RefreshCw, PanelLeftClose, PanelLeft, Info } from "lucide-react";
+import Sidebar from "@/components/Sidebar";
 import ChatPanel from "@/components/ChatPanel";
 import ArtifactPanel from "@/components/ArtifactPanel";
 import { Message, Artifact } from "@/lib/types";
 import { parseMessageContent } from "@/lib/parser";
+import { DBConversation } from "@/lib/db";
 
 export default function Home() {
+  const [conversations, setConversations] = useState<DBConversation[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  
-  // Track currently selected artifact and its active layout view
+  const [selectedModel, setSelectedModel] = useState("gemini-3.5-flash");
+
+  // Track currently selected artifact and panel states
   const [activeArtifact, setActiveArtifact] = useState<Artifact | null>(null);
   const [isArtifactPanelOpen, setIsArtifactPanelOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  // Parse chat stream for artifacts on-the-fly
+  // 1. Fetch conversations on initial mount
+  useEffect(() => {
+    const fetchConversations = async () => {
+      try {
+        const res = await fetch("/api/conversations");
+        if (res.ok) {
+          const data = await res.json();
+          const list: DBConversation[] = data.conversations || [];
+          setConversations(list);
+
+          // If there are conversations, select the first one; otherwise create a new one!
+          if (list.length > 0) {
+            handleSelectConversation(list[0].id);
+          } else {
+            handleCreateConversation();
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load conversations:", err);
+      }
+    };
+
+    fetchConversations();
+  }, []);
+
+  // 2. Select conversation and fetch its messages
+  const handleSelectConversation = async (id: string) => {
+    setActiveConversationId(id);
+    setIsLoading(true);
+    setMessages([]);
+    setActiveArtifact(null);
+    setIsArtifactPanelOpen(false);
+
+    try {
+      const res = await fetch(`/api/conversations?id=${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        // Convert dates from ISO string to Date objects
+        const loadedMessages = (data.messages || []).map((m: any) => ({
+          ...m,
+          timestamp: new Date(m.timestamp),
+        }));
+        setMessages(loadedMessages);
+
+        if (data.conversation) {
+          setSelectedModel(data.conversation.model || "gemini-3.5-flash");
+        }
+
+        // Auto-detect the last artifact in this conversation to restore layout preview state
+        let foundArtifact = null;
+        for (let i = loadedMessages.length - 1; i >= 0; i--) {
+          const { artifact } = parseMessageContent(loadedMessages[i].content);
+          if (artifact) {
+            foundArtifact = artifact;
+            break;
+          }
+        }
+
+        if (foundArtifact) {
+          setActiveArtifact({ ...foundArtifact, isComplete: true });
+          setIsArtifactPanelOpen(true);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load conversation details:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 3. Create a brand new conversation
+  const handleCreateConversation = async () => {
+    const id = `chat-${Date.now()}`;
+    const defaultTitle = "New Chat";
+
+    try {
+      const res = await fetch("/api/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create",
+          id,
+          title: defaultTitle,
+          model: selectedModel,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const newConv = data.conversation;
+        setConversations((prev) => [newConv, ...prev]);
+        setActiveConversationId(id);
+        setMessages([]);
+        setActiveArtifact(null);
+        setIsArtifactPanelOpen(false);
+      }
+    } catch (err) {
+      console.error("Failed to create conversation:", err);
+    }
+  };
+
+  // 4. Update conversation parameters (title, pin, model)
+  const handleUpdateConversation = async (id: string, updates: { title?: string; pinned?: boolean; model?: string }) => {
+    try {
+      const res = await fetch("/api/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update",
+          id,
+          ...updates,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const updated = data.conversation;
+
+        setConversations((prev) =>
+          prev
+            .map((c) => (c.id === id ? updated : c))
+            .sort((a, b) => {
+              if (a.pinned && !b.pinned) return -1;
+              if (!a.pinned && b.pinned) return 1;
+              return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+            })
+        );
+
+        if (updates.model) {
+          setSelectedModel(updates.model);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to update conversation:", err);
+    }
+  };
+
+  // 5. Delete a conversation
+  const handleDeleteConversation = async (id: string) => {
+    try {
+      const res = await fetch("/api/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "delete",
+          id,
+        }),
+      });
+
+      if (res.ok) {
+        const remaining = conversations.filter((c) => c.id !== id);
+        setConversations(remaining);
+
+        if (activeConversationId === id) {
+          if (remaining.length > 0) {
+            handleSelectConversation(remaining[0].id);
+          } else {
+            handleCreateConversation();
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Failed to delete conversation:", err);
+    }
+  };
+
+  // 6. Handle streaming Chat response
   const handleChatStream = async (chatHistory: Message[]) => {
+    if (!activeConversationId) return;
     setIsLoading(true);
     
     // Create placeholder assistant message
@@ -37,7 +210,11 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ messages: chatHistory }),
+        body: JSON.stringify({
+          messages: chatHistory,
+          conversationId: activeConversationId,
+          model: selectedModel,
+        }),
       });
 
       if (!response.ok) {
@@ -86,6 +263,13 @@ export default function Home() {
         return prev;
       });
 
+      // Reload conversations to sync sidebar updatedAt field and order
+      const resConv = await fetch("/api/conversations");
+      if (resConv.ok) {
+        const data = await resConv.json();
+        setConversations(data.conversations || []);
+      }
+
     } catch (err: any) {
       console.error("Streaming error:", err);
       setMessages((prev) =>
@@ -100,9 +284,10 @@ export default function Home() {
     }
   };
 
+  // 7. Submit user message
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isLoading || !activeConversationId) return;
 
     const userMessage: Message = {
       id: "user-" + Date.now(),
@@ -115,11 +300,18 @@ export default function Home() {
     setMessages(updatedHistory);
     setInput("");
 
+    // Auto-update conversation title if it is currently a placeholder
+    const activeConv = conversations.find((c) => c.id === activeConversationId);
+    if (activeConv && activeConv.title === "New Chat") {
+      const draftTitle = input.trim().substring(0, 32) + (input.trim().length > 32 ? "..." : "");
+      handleUpdateConversation(activeConversationId, { title: draftTitle });
+    }
+
     // Start stream
     handleChatStream(updatedHistory);
   };
 
-  // Callback to handle changes inside the active artifact (code/JSON updates)
+  // 8. Callback to handle changes inside the active artifact (code/JSON updates)
   const handleArtifactContentChange = (newContent: string) => {
     if (!activeArtifact) return;
     
@@ -153,76 +345,120 @@ export default function Home() {
     setIsArtifactPanelOpen(true);
   };
 
-  const handleResetChat = () => {
-    setMessages([]);
-    setActiveArtifact(null);
-    setIsArtifactPanelOpen(false);
-    setInput("");
+  const handleClearWorkspace = async () => {
+    if (confirm("Are you sure you want to clear all conversations and history?")) {
+      try {
+        const res = await fetch("/api/conversations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "clear" }),
+        });
+        if (res.ok) {
+          setConversations([]);
+          setActiveConversationId(null);
+          setMessages([]);
+          setActiveArtifact(null);
+          setIsArtifactPanelOpen(false);
+          handleCreateConversation();
+        }
+      } catch (err) {
+        console.error("Failed to clear data:", err);
+      }
+    }
   };
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-[#fdfdfd] text-[#1a1a1a] overflow-hidden" id="app-root-viewport">
-      {/* Universal Top Nav */}
-      <header className="bg-white border-b border-[#ececec] px-6 py-3.5 flex items-center justify-between shadow-sm z-15 select-none" id="main-header">
-        <div className="flex items-center space-x-3">
-          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#6d28d9] text-white shadow-sm">
-            <Sparkles size={16} />
+    <div className="flex h-screen w-screen bg-[#fdfdfd] text-[#1a1a1a] overflow-hidden" id="app-root-viewport">
+      {/* 1. Left Sidebar Panels */}
+      {isSidebarOpen && (
+        <Sidebar
+          conversations={conversations}
+          activeId={activeConversationId}
+          onSelect={handleSelectConversation}
+          onCreate={handleCreateConversation}
+          onUpdate={handleUpdateConversation}
+          onDelete={handleDeleteConversation}
+          selectedModel={selectedModel}
+          onModelChange={(model) => {
+            setSelectedModel(model);
+            if (activeConversationId) {
+              handleUpdateConversation(activeConversationId, { model });
+            }
+          }}
+        />
+      )}
+
+      {/* 2. Main Content Layout Area */}
+      <div className="flex-1 flex flex-col min-w-0" id="main-layout-container">
+        {/* Universal Top Navigation Header */}
+        <header className="bg-white border-b border-[#ececec] px-6 py-3.5 flex items-center justify-between shadow-sm z-15 select-none" id="main-header">
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-1.5 hover:bg-[#f3f4f6] rounded-lg border border-[#e0e0e0] text-[#555] hover:text-[#1a1a1a] cursor-pointer transition-colors shadow-sm mr-1"
+              title={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+            >
+              {isSidebarOpen ? <PanelLeftClose size={14} /> : <PanelLeft size={14} />}
+            </button>
+            <div className="flex flex-col">
+              <span className="font-sans font-bold text-[#1a1a1a] text-sm tracking-tight leading-none flex items-center space-x-1.5">
+                <span>Claude Artifact Studio</span>
+                <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-semibold border border-blue-100">
+                  V2 ACTIVE
+                </span>
+              </span>
+              <span className="text-[10px] text-[#8e8e8e] font-semibold tracking-wider font-mono mt-0.5 uppercase">
+                Professional Plan Workspace
+              </span>
+            </div>
           </div>
-          <div className="flex flex-col">
-            <span className="font-sans font-bold text-[#1a1a1a] text-sm tracking-tight leading-none">
-              Claude Artifact Studio
-            </span>
-            <span className="text-[10px] text-[#8e8e8e] font-semibold tracking-wider font-mono mt-0.5 uppercase">
-              Professional Plan Workspace
-            </span>
+
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={handleClearWorkspace}
+              className="flex items-center space-x-1.5 text-xs text-red-600 hover:text-white hover:bg-red-600 bg-white border border-red-200 hover:border-red-600 px-3 py-1.5 rounded-lg shadow-sm transition-all cursor-pointer font-bold"
+              title="Wipe database completely"
+            >
+              <RefreshCw size={13} />
+              <span>Wipe Studio DB</span>
+            </button>
           </div>
-        </div>
+        </header>
 
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={handleResetChat}
-            className="flex items-center space-x-1.5 text-xs text-[#555] hover:text-[#1a1a1a] bg-white hover:bg-[#f9f9f8] border border-[#e0e0e0] px-3 py-1.5 rounded-lg shadow-sm transition-colors cursor-pointer"
-            title="Reset active sandbox"
-          >
-            <RefreshCw size={13} className="text-[#8e8e8e]" />
-            <span>Reset Workspace</span>
-          </button>
-        </div>
-      </header>
-
-      {/* Split Main Screen Panel */}
-      <div className="flex-1 flex overflow-hidden relative" id="split-screen-container">
-        {/* Left Column: Chat panel */}
-        <div
-          className={`h-full transition-all duration-300 ${
-            isArtifactPanelOpen ? "w-full lg:w-[42%]" : "w-full"
-          }`}
-          id="chat-column-wrapper"
-        >
-          <ChatPanel
-            messages={messages}
-            input={input}
-            onInputChange={setInput}
-            onSubmit={handleSubmit}
-            isLoading={isLoading}
-            onSelectArtifact={handleSelectArtifact}
-            activeArtifactId={activeArtifact?.id}
-          />
-        </div>
-
-        {/* Right Column: Artifact panel (Slid-in screen) */}
-        {isArtifactPanelOpen && activeArtifact && (
+        {/* Split Main Screen Content Panel */}
+        <div className="flex-1 flex overflow-hidden relative" id="split-screen-container">
+          {/* Left Column: Chat panel */}
           <div
-            className="absolute lg:static top-0 right-0 w-full lg:w-[58%] h-full z-20 lg:z-auto shadow-2xl lg:shadow-none animate-in fade-in slide-in-from-right duration-200"
-            id="artifact-column-wrapper"
+            className={`h-full transition-all duration-300 ${
+              isArtifactPanelOpen ? "w-full lg:w-[42%]" : "w-full"
+            }`}
+            id="chat-column-wrapper"
           >
-            <ArtifactPanel
-              artifact={activeArtifact}
-              onClose={() => setIsArtifactPanelOpen(false)}
-              onContentChange={handleArtifactContentChange}
+            <ChatPanel
+              messages={messages}
+              input={input}
+              onInputChange={setInput}
+              onSubmit={handleSubmit}
+              isLoading={isLoading}
+              onSelectArtifact={handleSelectArtifact}
+              activeArtifactId={activeArtifact?.id}
             />
           </div>
-        )}
+
+          {/* Right Column: Artifact panel (Slid-in screen) */}
+          {isArtifactPanelOpen && activeArtifact && (
+            <div
+              className="absolute lg:static top-0 right-0 w-full lg:w-[58%] h-full z-20 lg:z-auto shadow-2xl lg:shadow-none animate-in fade-in slide-in-from-right duration-200"
+              id="artifact-column-wrapper"
+            >
+              <ArtifactPanel
+                artifact={activeArtifact}
+                onClose={() => setIsArtifactPanelOpen(false)}
+                onContentChange={handleArtifactContentChange}
+              />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -16,7 +16,7 @@ export function parseMessageContent(text: string): ParsedMessage {
     };
   }
 
-  const type = startMatch[1] as "html" | "word" | "ppt" | "excel";
+  const type = startMatch[1] as "html" | "word" | "ppt" | "excel" | "svg" | "mermaid";
   const id = startMatch[2];
   const title = startMatch[3];
   

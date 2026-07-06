@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { NextRequest } from "next/server";
+import { db } from "@/lib/db";
 
 export const runtime = "nodejs";
 
@@ -145,13 +146,25 @@ Avoid any markdown formatting around the JSON inside the word, ppt, and excel ar
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages } = await req.json();
+    const { messages, conversationId, model = "gemini-3.5-flash" } = await req.json();
 
     if (!process.env.GEMINI_API_KEY) {
       return new Response(
         JSON.stringify({ error: "GEMINI_API_KEY environment variable is not configured." }),
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
+    }
+
+    // Persist user's message in local DB if conversationId is provided
+    if (conversationId && messages.length > 0) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg.role === "user") {
+        db.saveMessage(conversationId, {
+          id: lastMsg.id || `user-${Date.now()}`,
+          role: "user",
+          content: lastMsg.content,
+        });
+      }
     }
 
     const ai = new GoogleGenAI({
@@ -169,8 +182,11 @@ export async function POST(req: NextRequest) {
       parts: [{ text: m.content }],
     }));
 
+    // Choose the actual active model (fallback to gemini-3.5-flash)
+    const activeModel = model === "gemini-3.5-pro" ? "gemini-3.5-pro" : "gemini-3.5-flash";
+
     const responseStream = await ai.models.generateContentStream({
-      model: "gemini-3.5-flash",
+      model: activeModel,
       contents,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
@@ -180,12 +196,24 @@ export async function POST(req: NextRequest) {
 
     const stream = new ReadableStream({
       async start(controller) {
+        let accumulatedText = "";
         try {
           for await (const chunk of responseStream) {
             if (chunk.text) {
+              accumulatedText += chunk.text;
               controller.enqueue(new TextEncoder().encode(chunk.text));
             }
           }
+
+          // Persist generated response in local DB upon complete generation
+          if (conversationId && accumulatedText) {
+            db.saveMessage(conversationId, {
+              id: `assistant-${Date.now()}`,
+              role: "assistant",
+              content: accumulatedText,
+            });
+          }
+
           controller.close();
         } catch (error) {
           controller.error(error);
