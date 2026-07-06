@@ -1,323 +1,343 @@
-import fs from "fs";
-import path from "path";
+import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/lib/generated/prisma/client";
+import type {
+  DBConversation,
+  DBMessage,
+  DBArtifactVersion,
+  DBRemoteAgentJob,
+  DBWebhookEvent,
+} from "@/lib/dbTypes";
 
-export interface DBConversation {
+export type {
+  DBConversation,
+  DBMessage,
+  DBArtifactVersion,
+  DBRemoteAgentJob,
+  DBWebhookEvent,
+} from "@/lib/dbTypes";
+
+// Prisma returns `Date` for DateTime columns; every consumer of this module
+// (API routes, ultimately JSON-serialized to the client) expects the same
+// ISO string shape the old file-based db.json returned, so every read maps
+// Date -> string at the boundary here rather than pushing that concern out
+// to every call site.
+function toConversation(row: {
   id: string;
   title: string;
   pinned: boolean;
-  createdAt: string;
-  updatedAt: string;
   model: string;
+  createdAt: Date;
+  updatedAt: Date;
+}): DBConversation {
+  return {
+    id: row.id,
+    title: row.title,
+    pinned: row.pinned,
+    model: row.model,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
 }
 
-export interface DBMessage {
+function toMessage(row: {
   id: string;
   conversationId: string;
-  role: "user" | "assistant";
+  role: string;
   content: string;
-  timestamp: string;
+  timestamp: Date;
+}): DBMessage {
+  return {
+    id: row.id,
+    conversationId: row.conversationId,
+    role: row.role as "user" | "assistant",
+    content: row.content,
+    timestamp: row.timestamp.toISOString(),
+  };
 }
 
-export interface DBArtifactVersion {
+function toArtifactVersion(row: {
   id: string;
   artifactId: string;
   version: number;
   content: string;
-  type: string; // "html" | "word" | "ppt" | "excel" | "react" | "svg" | "mermaid"
+  type: string;
   title: string;
-  createdAt: string;
+  createdAt: Date;
+}): DBArtifactVersion {
+  return {
+    id: row.id,
+    artifactId: row.artifactId,
+    version: row.version,
+    content: row.content,
+    type: row.type,
+    title: row.title,
+    createdAt: row.createdAt.toISOString(),
+  };
 }
 
-export interface DBRemoteAgentJob {
+function toJob(row: {
   id: string;
   conversationId: string;
-  messageId?: string; // the assistant Message this job is fulfilling, once known
+  messageId: string | null;
   userId: string;
-  agentType: string; // "antigravity" | "deep_research" | "deep_research_max"
+  agentType: string;
   geminiInteractionId: string;
-  status: "queued" | "in_progress" | "requires_action" | "completed" | "failed" | "cancelled";
-  inputSummary: string; // short human-readable description of what was asked, for the sidebar/UI
-  resultJson?: string; // final output payload once completed (Text/Json)
-  errorMessage?: string;
-  createdAt: string;
-  updatedAt: string;
+  status: string;
+  inputSummary: string;
+  resultJson: string | null;
+  errorMessage: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}): DBRemoteAgentJob {
+  return {
+    id: row.id,
+    conversationId: row.conversationId,
+    messageId: row.messageId ?? undefined,
+    userId: row.userId,
+    agentType: row.agentType,
+    geminiInteractionId: row.geminiInteractionId,
+    status: row.status as DBRemoteAgentJob["status"],
+    inputSummary: row.inputSummary,
+    resultJson: row.resultJson ?? undefined,
+    errorMessage: row.errorMessage ?? undefined,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
 }
 
-export interface DBWebhookEvent {
+function toWebhookEvent(row: {
   id: string;
-  webhookId: string; // the webhook-id header value, unique
+  webhookId: string;
   eventType: string;
-  receivedAt: string;
-  processedAt?: string;
+  receivedAt: Date;
+  processedAt: Date | null;
   rawPayload: string;
+}): DBWebhookEvent {
+  return {
+    id: row.id,
+    webhookId: row.webhookId,
+    eventType: row.eventType,
+    receivedAt: row.receivedAt.toISOString(),
+    processedAt: row.processedAt ? row.processedAt.toISOString() : undefined,
+    rawPayload: row.rawPayload,
+  };
 }
 
-export interface DBData {
-  conversations: DBConversation[];
-  messages: DBMessage[];
-  artifactVersions: DBArtifactVersion[];
-  jobs: DBRemoteAgentJob[];
-  webhookEvents: DBWebhookEvent[];
-}
-
-const DB_FILE = path.join(process.cwd(), "db.json");
-
-// In-memory cache to make reads instantaneous
-let cache: DBData | null = null;
-
-function loadDB(): DBData {
-  if (cache) return cache;
-
+// Prisma's update()/delete() throw P2025 when the row doesn't exist. The old
+// file-based implementation was a no-op/undefined-returning `.find()` in
+// that case, and every call site relies on that lenient contract (checking
+// `if (updatedJob)` rather than catching an exception), so this restores it.
+async function ignoreNotFound<T>(fn: () => Promise<T>): Promise<T | undefined> {
   try {
-    if (fs.existsSync(DB_FILE)) {
-      const data = fs.readFileSync(DB_FILE, "utf-8");
-      cache = JSON.parse(data);
-    } else {
-      cache = {
-        conversations: [],
-        messages: [],
-        artifactVersions: [],
-        jobs: [],
-        webhookEvents: [],
-      };
-      saveDB(cache);
+    return await fn();
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025") {
+      return undefined;
     }
-  } catch (error) {
-    console.error("Failed to load local DB, fallback to empty state", error);
-    cache = {
-      conversations: [],
-      messages: [],
-      artifactVersions: [],
-      jobs: [],
-      webhookEvents: [],
-    };
-  }
-
-  // Ensure cache is not null and arrays exist
-  if (!cache) {
-    cache = {
-      conversations: [],
-      messages: [],
-      artifactVersions: [],
-      jobs: [],
-      webhookEvents: [],
-    };
-  }
-  if (!cache.conversations) cache.conversations = [];
-  if (!cache.messages) cache.messages = [];
-  if (!cache.artifactVersions) cache.artifactVersions = [];
-  if (!cache.jobs) cache.jobs = [];
-  if (!cache.webhookEvents) cache.webhookEvents = [];
-
-  return cache;
-}
-
-function saveDB(data: DBData) {
-  try {
-    cache = data;
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
-  } catch (error) {
-    console.error("Failed to save local DB:", error);
+    throw err;
   }
 }
 
-// Thread-safe repository operations
+function generateId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
 export const db = {
-  getConversations(): DBConversation[] {
-    const data = loadDB();
-    return [...data.conversations].sort((a, b) => {
-      if (a.pinned && !b.pinned) return -1;
-      if (!a.pinned && b.pinned) return 1;
-      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+  async getConversations(): Promise<DBConversation[]> {
+    const rows = await prisma.conversation.findMany({
+      orderBy: [{ pinned: "desc" }, { updatedAt: "desc" }],
     });
+    return rows.map(toConversation);
   },
 
-  getConversation(id: string): DBConversation | undefined {
-    const data = loadDB();
-    return data.conversations.find((c) => c.id === id);
+  async getConversation(id: string): Promise<DBConversation | undefined> {
+    const row = await prisma.conversation.findUnique({ where: { id } });
+    return row ? toConversation(row) : undefined;
   },
 
-  createConversation(id: string, title: string, model: string = "gemini-3.5-flash"): DBConversation {
-    const data = loadDB();
-    const newConv: DBConversation = {
-      id,
-      title,
-      pinned: false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      model,
-    };
-    data.conversations.push(newConv);
-    saveDB(data);
-    return newConv;
-  },
-
-  updateConversation(id: string, updates: Partial<Omit<DBConversation, "id" | "createdAt">>): DBConversation | undefined {
-    const data = loadDB();
-    const conv = data.conversations.find((c) => c.id === id);
-    if (conv) {
-      Object.assign(conv, updates, { updatedAt: new Date().toISOString() });
-      saveDB(data);
-    }
-    return conv;
-  },
-
-  deleteConversation(id: string): void {
-    const data = loadDB();
-    data.conversations = data.conversations.filter((c) => c.id !== id);
-    data.messages = data.messages.filter((m) => m.conversationId !== id);
-    // Also remove artifact versions related to this conversation? 
-    // Usually artifact versions are linked through conversationId in practice or can be kept/pruned.
-    saveDB(data);
-  },
-
-  getMessages(conversationId: string): DBMessage[] {
-    const data = loadDB();
-    return data.messages
-      .filter((m) => m.conversationId === conversationId)
-      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-  },
-
-  saveMessage(conversationId: string, message: { id: string; role: "user" | "assistant"; content: string }): DBMessage {
-    const data = loadDB();
-    
-    // Remove if message with same ID already exists to avoid duplication
-    data.messages = data.messages.filter((m) => m.id !== message.id);
-
-    const newMsg: DBMessage = {
-      id: message.id,
-      conversationId,
-      role: message.role,
-      content: message.content,
-      timestamp: new Date().toISOString(),
-    };
-    data.messages.push(newMsg);
-
-    // Update conversation's updatedAt timestamp
-    const conv = data.conversations.find((c) => c.id === conversationId);
-    if (conv) {
-      conv.updatedAt = new Date().toISOString();
-    }
-
-    saveDB(data);
-    return newMsg;
-  },
-
-  getArtifactVersions(artifactId: string): DBArtifactVersion[] {
-    const data = loadDB();
-    return data.artifactVersions
-      .filter((v) => v.artifactId === artifactId)
-      .sort((a, b) => a.version - b.version);
-  },
-
-  saveArtifactVersion(artifactId: string, versionData: { content: string; type: string; title: string }): DBArtifactVersion {
-    const data = loadDB();
-    const existingVersions = data.artifactVersions.filter((v) => v.artifactId === artifactId);
-    const nextVersionNum = existingVersions.length > 0 
-      ? Math.max(...existingVersions.map((v) => v.version)) + 1 
-      : 1;
-
-    const newVer: DBArtifactVersion = {
-      id: `${artifactId}-v${nextVersionNum}-${Date.now()}`,
-      artifactId,
-      version: nextVersionNum,
-      content: versionData.content,
-      type: versionData.type,
-      title: versionData.title,
-      createdAt: new Date().toISOString(),
-    };
-
-    data.artifactVersions.push(newVer);
-    saveDB(data);
-    return newVer;
-  },
-
-  clearAll(): void {
-    saveDB({
-      conversations: [],
-      messages: [],
-      artifactVersions: [],
-      jobs: [],
-      webhookEvents: [],
+  async createConversation(
+    id: string,
+    title: string,
+    model: string = "gemini-3.5-flash"
+  ): Promise<DBConversation> {
+    const row = await prisma.conversation.create({
+      data: { id, title, model, pinned: false },
     });
+    return toConversation(row);
+  },
+
+  async updateConversation(
+    id: string,
+    updates: Partial<Omit<DBConversation, "id" | "createdAt">>
+  ): Promise<DBConversation | undefined> {
+    const row = await ignoreNotFound(() =>
+      prisma.conversation.update({ where: { id }, data: updates })
+    );
+    return row ? toConversation(row) : undefined;
+  },
+
+  async deleteConversation(id: string): Promise<void> {
+    // Messages cascade-delete via the schema relation; artifact versions,
+    // jobs, and webhook events are intentionally left behind, matching the
+    // previous file-based implementation.
+    await ignoreNotFound(() => prisma.conversation.delete({ where: { id } }));
+  },
+
+  async getMessages(conversationId: string): Promise<DBMessage[]> {
+    const rows = await prisma.message.findMany({
+      where: { conversationId },
+      orderBy: { timestamp: "asc" },
+    });
+    return rows.map(toMessage);
+  },
+
+  async saveMessage(
+    conversationId: string,
+    message: { id: string; role: "user" | "assistant"; content: string }
+  ): Promise<DBMessage> {
+    const [row] = await prisma.$transaction([
+      prisma.message.upsert({
+        where: { id: message.id },
+        create: {
+          id: message.id,
+          conversationId,
+          role: message.role,
+          content: message.content,
+        },
+        update: {
+          role: message.role,
+          content: message.content,
+        },
+      }),
+      prisma.conversation.update({
+        where: { id: conversationId },
+        data: {},
+      }),
+    ]);
+    return toMessage(row);
+  },
+
+  async getArtifactVersions(artifactId: string): Promise<DBArtifactVersion[]> {
+    const rows = await prisma.artifactVersion.findMany({
+      where: { artifactId },
+      orderBy: { version: "asc" },
+    });
+    return rows.map(toArtifactVersion);
+  },
+
+  async saveArtifactVersion(
+    artifactId: string,
+    versionData: { content: string; type: string; title: string }
+  ): Promise<DBArtifactVersion> {
+    const row = await prisma.$transaction(async (tx) => {
+      const latest = await tx.artifactVersion.aggregate({
+        where: { artifactId },
+        _max: { version: true },
+      });
+      const nextVersion = (latest._max.version ?? 0) + 1;
+      return tx.artifactVersion.create({
+        data: {
+          id: generateId(`${artifactId}-v${nextVersion}`),
+          artifactId,
+          version: nextVersion,
+          content: versionData.content,
+          type: versionData.type,
+          title: versionData.title,
+        },
+      });
+    });
+    return toArtifactVersion(row);
+  },
+
+  async clearAll(): Promise<void> {
+    await prisma.$transaction([
+      prisma.message.deleteMany({}),
+      prisma.conversation.deleteMany({}),
+      prisma.artifactVersion.deleteMany({}),
+      prisma.remoteAgentJob.deleteMany({}),
+      prisma.webhookEvent.deleteMany({}),
+    ]);
   },
 
   // Jobs
-  getJob(id: string): DBRemoteAgentJob | undefined {
-    const data = loadDB();
-    return data.jobs.find((j) => j.id === id);
+  async getJob(id: string): Promise<DBRemoteAgentJob | undefined> {
+    const row = await prisma.remoteAgentJob.findUnique({ where: { id } });
+    return row ? toJob(row) : undefined;
   },
 
-  getJobByInteractionId(geminiInteractionId: string): DBRemoteAgentJob | undefined {
-    const data = loadDB();
-    return data.jobs.find((j) => j.geminiInteractionId === geminiInteractionId);
+  async getJobByInteractionId(geminiInteractionId: string): Promise<DBRemoteAgentJob | undefined> {
+    const row = await prisma.remoteAgentJob.findUnique({ where: { geminiInteractionId } });
+    return row ? toJob(row) : undefined;
   },
 
-  getJobsForConversation(conversationId: string): DBRemoteAgentJob[] {
-    const data = loadDB();
-    return data.jobs.filter((j) => j.conversationId === conversationId);
+  async getJobsForConversation(conversationId: string): Promise<DBRemoteAgentJob[]> {
+    const rows = await prisma.remoteAgentJob.findMany({ where: { conversationId } });
+    return rows.map(toJob);
   },
 
-  getPendingJobs(): DBRemoteAgentJob[] {
-    const data = loadDB();
-    return data.jobs.filter((j) => ["queued", "in_progress", "requires_action"].includes(j.status));
+  async getPendingJobs(): Promise<DBRemoteAgentJob[]> {
+    const rows = await prisma.remoteAgentJob.findMany({
+      where: { status: { in: ["queued", "in_progress", "requires_action"] } },
+    });
+    return rows.map(toJob);
   },
 
-  createJob(conversationId: string, userId: string, agentType: string, geminiInteractionId: string, inputSummary: string): DBRemoteAgentJob {
-    const data = loadDB();
-    const newJob: DBRemoteAgentJob = {
-      id: `job-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      conversationId,
-      userId,
-      agentType,
-      geminiInteractionId,
-      status: "queued",
-      inputSummary,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    data.jobs.push(newJob);
-    saveDB(data);
-    return newJob;
+  async createJob(
+    conversationId: string,
+    userId: string,
+    agentType: string,
+    geminiInteractionId: string,
+    inputSummary: string
+  ): Promise<DBRemoteAgentJob> {
+    const row = await prisma.remoteAgentJob.create({
+      data: {
+        id: generateId("job"),
+        conversationId,
+        userId,
+        agentType,
+        geminiInteractionId,
+        status: "queued",
+        inputSummary,
+      },
+    });
+    return toJob(row);
   },
 
-  updateJob(id: string, updates: Partial<Omit<DBRemoteAgentJob, "id" | "createdAt">>): DBRemoteAgentJob | undefined {
-    const data = loadDB();
-    const job = data.jobs.find((j) => j.id === id);
-    if (job) {
-      Object.assign(job, updates, { updatedAt: new Date().toISOString() });
-      saveDB(data);
-    }
-    return job;
+  async updateJob(
+    id: string,
+    updates: Partial<Omit<DBRemoteAgentJob, "id" | "createdAt">>
+  ): Promise<DBRemoteAgentJob | undefined> {
+    const row = await ignoreNotFound(() =>
+      prisma.remoteAgentJob.update({ where: { id }, data: updates })
+    );
+    return row ? toJob(row) : undefined;
   },
 
   // Webhook Events
-  getWebhookEvent(webhookId: string): DBWebhookEvent | undefined {
-    const data = loadDB();
-    return data.webhookEvents.find((e) => e.webhookId === webhookId);
+  async getWebhookEvent(webhookId: string): Promise<DBWebhookEvent | undefined> {
+    const row = await prisma.webhookEvent.findUnique({ where: { webhookId } });
+    return row ? toWebhookEvent(row) : undefined;
   },
 
-  createWebhookEvent(webhookId: string, eventType: string, rawPayload: string): DBWebhookEvent {
-    const data = loadDB();
-    const newEvent: DBWebhookEvent = {
-      id: `whe-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      webhookId,
-      eventType,
-      receivedAt: new Date().toISOString(),
-      rawPayload,
-    };
-    data.webhookEvents.push(newEvent);
-    saveDB(data);
-    return newEvent;
+  async createWebhookEvent(
+    webhookId: string,
+    eventType: string,
+    rawPayload: string
+  ): Promise<DBWebhookEvent> {
+    const row = await prisma.webhookEvent.create({
+      data: { id: generateId("whe"), webhookId, eventType, rawPayload },
+    });
+    return toWebhookEvent(row);
   },
 
-  updateWebhookEvent(webhookId: string, updates: Partial<DBWebhookEvent>): DBWebhookEvent | undefined {
-    const data = loadDB();
-    const event = data.webhookEvents.find((e) => e.webhookId === webhookId);
-    if (event) {
-      Object.assign(event, updates);
-      saveDB(data);
-    }
-    return event;
-  }
+  async updateWebhookEvent(
+    webhookId: string,
+    updates: Partial<DBWebhookEvent>
+  ): Promise<DBWebhookEvent | undefined> {
+    const { id, webhookId: _wh, ...rest } = updates;
+    const row = await ignoreNotFound(() =>
+      prisma.webhookEvent.update({ where: { webhookId }, data: rest })
+    );
+    return row ? toWebhookEvent(row) : undefined;
+  },
 };

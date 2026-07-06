@@ -16,7 +16,7 @@ import {
   Archive,
   Star,
 } from "lucide-react";
-import { DBConversation } from "@/lib/db";
+import type { DBConversation } from "@/lib/dbTypes";
 
 const SIDEBAR_MIN_WIDTH = 200;
 const SIDEBAR_MAX_WIDTH = 420;

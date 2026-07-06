@@ -1,0 +1,78 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Mirrors lib/db.ts's DBConversation. Messages cascade-delete with their
+// conversation (matching the previous file-based db's deleteConversation
+// behavior); artifact versions, jobs, and webhook events intentionally do
+// NOT cascade — the old implementation left those in place too.
+model Conversation {
+  id        String    @id
+  title     String
+  pinned    Boolean   @default(false)
+  model     String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  messages  Message[]
+}
+
+model Message {
+  id             String       @id
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String
+  content        String
+  timestamp      DateTime     @default(now())
+
+  @@index([conversationId])
+}
+
+// artifactId is a free-form id chosen by the model when it opens an
+// <artifact> tag — there is no separate "Artifact" table, only its
+// versions, exactly as in the previous file-based implementation.
+model ArtifactVersion {
+  id         String   @id
+  artifactId String
+  version    Int
+  content    String
+  type       String
+  title      String
+  createdAt  DateTime @default(now())
+
+  @@unique([artifactId, version])
+  @@index([artifactId])
+}
+
+model RemoteAgentJob {
+  id                  String   @id
+  conversationId      String
+  messageId           String?
+  userId              String
+  agentType           String
+  geminiInteractionId String   @unique
+  status              String
+  inputSummary        String
+  resultJson          String?
+  errorMessage        String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([conversationId])
+}
+
+model WebhookEvent {
+  id          String    @id
+  webhookId   String    @unique
+  eventType   String
+  receivedAt  DateTime  @default(now())
+  processedAt DateTime?
+  rawPayload  String
+}

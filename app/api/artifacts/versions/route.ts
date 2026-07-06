@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Missing artifactId parameter" }, { status: 400 });
     }
 
-    const versions = db.getArtifactVersions(artifactId);
+    const versions = await db.getArtifactVersions(artifactId);
     return NextResponse.json({ versions });
   } catch (error: any) {
     console.error("GET Artifact Versions Error:", error);
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
       content = JSON.stringify(parsed.content);
     }
 
-    const savedVersion = db.saveArtifactVersion(artifactId, { content, type, title });
+    const savedVersion = await db.saveArtifactVersion(artifactId, { content, type, title });
     return NextResponse.json({ version: savedVersion });
   } catch (error: any) {
     console.error("POST Artifact Versions Error:", error);

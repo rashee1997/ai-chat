@@ -84,7 +84,7 @@ function MessageRow({ message, isStreaming, onSelectArtifact, activeArtifactId }
       <div className={`max-w-[85%] space-y-2 ${isUser ? "text-right" : "text-left"}`}>
         {/* Username indicator */}
         <div className="text-[10px] text-on-surface-muted font-semibold uppercase tracking-wider select-none">
-          {isUser ? "You" : "Claude Assistant"}
+          {isUser ? "You" : "Assistant"}
         </div>
 
         {/* Conversational bubble — a detected background-job status swaps in

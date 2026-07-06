@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Missing conversationId parameter" }, { status: 400 });
     }
 
-    const jobs = db.getJobsForConversation(conversationId);
+    const jobs = await db.getJobsForConversation(conversationId);
     return NextResponse.json({ jobs });
   } catch (error: any) {
     console.error("GET Jobs Error:", error);

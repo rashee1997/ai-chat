@@ -1,4 +1,4 @@
-# Design Brief — Claude Artifact Studio
+# Design Brief — Artifact Studio AI
 
 > Living document. Update this file when a visual decision repeats (a new
 > button style, alert pattern, or spacing choice shows up more than once) —

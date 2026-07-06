@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { GoogleGenAI } from "@google/genai";
 import { parseMessageContent } from "@/lib/parser";
-import { pubsub } from "@/lib/pubsub";
 
 export const runtime = "nodejs";
 
@@ -12,7 +11,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    let job = db.getJob(id);
+    let job = await db.getJob(id);
 
     if (!job) {
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
@@ -51,7 +50,7 @@ export async function GET(
             }
 
             const messageId = job.messageId || `assistant-${Date.now()}`;
-            db.saveMessage(job.conversationId, {
+            await db.saveMessage(job.conversationId, {
               id: messageId,
               role: "assistant",
               content: fullOutput,
@@ -59,71 +58,45 @@ export async function GET(
 
             const { artifact } = parseMessageContent(fullOutput);
             if (artifact) {
-              db.saveArtifactVersion(artifact.id, {
+              await db.saveArtifactVersion(artifact.id, {
                 content: artifact.content,
                 type: artifact.type,
                 title: artifact.title,
               });
             }
 
-            const updatedJob = db.updateJob(job.id, {
+            const updatedJob = await db.updateJob(job.id, {
               status: "completed",
               messageId,
               resultJson: JSON.stringify({ text: fullOutput }),
             });
 
-            if (updatedJob) {
-              job = updatedJob;
-              pubsub.publish(job.id, {
-                jobId: job.id,
-                conversationId: job.conversationId,
-                status: "completed",
-                messageId,
-                result: fullOutput,
-              });
-            }
+            if (updatedJob) job = updatedJob;
           } else if (interaction.status === "failed") {
             const errorMessage =
               (interaction as any).error?.message || "Interaction failed during remote agent execution.";
 
             const messageId = job.messageId || `assistant-${Date.now()}`;
-            db.saveMessage(job.conversationId, {
+            await db.saveMessage(job.conversationId, {
               id: messageId,
               role: "assistant",
               content: `⚠️ Background task failed: ${errorMessage}`,
             });
 
-            const updatedJob = db.updateJob(job.id, {
+            const updatedJob = await db.updateJob(job.id, {
               status: "failed",
               errorMessage,
             });
 
-            if (updatedJob) {
-              job = updatedJob;
-              pubsub.publish(job.id, {
-                jobId: job.id,
-                conversationId: job.conversationId,
-                status: "failed",
-                messageId,
-                errorMessage,
-              });
-            }
+            if (updatedJob) job = updatedJob;
           } else if (interaction.status === "requires_action") {
             const actionPayload = (interaction as any).requires_action || null;
-            const updatedJob = db.updateJob(job.id, {
+            const updatedJob = await db.updateJob(job.id, {
               status: "requires_action",
               resultJson: actionPayload ? JSON.stringify(actionPayload) : undefined,
             });
 
-            if (updatedJob) {
-              job = updatedJob;
-              pubsub.publish(job.id, {
-                jobId: job.id,
-                conversationId: job.conversationId,
-                status: "requires_action",
-                actionRequired: actionPayload,
-              });
-            }
+            if (updatedJob) job = updatedJob;
           }
         } catch (err) {
           console.error("Lazy reconciliation failed for job:", job.id, err);
@@ -149,7 +122,7 @@ export async function POST(
     const { id } = await params;
     const { input } = await req.json();
 
-    const job = db.getJob(id);
+    const job = await db.getJob(id);
     if (!job) {
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
     }
@@ -191,18 +164,10 @@ export async function POST(
     });
 
     // Update the local database job status back to in_progress with the new interaction ID
-    const updatedJob = db.updateJob(job.id, {
+    const updatedJob = await db.updateJob(job.id, {
       geminiInteractionId: nextInteraction.id,
       status: "in_progress",
     });
-
-    if (updatedJob) {
-      pubsub.publish(job.id, {
-        jobId: job.id,
-        conversationId: job.conversationId,
-        status: "in_progress",
-      });
-    }
 
     return NextResponse.json({ success: true, job: updatedJob });
   } catch (error: any) {

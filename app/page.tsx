@@ -13,7 +13,7 @@ import {
   formatBackgroundJobActionRequired,
   formatBackgroundJobFailed,
 } from "@/lib/backgroundJobMessages";
-import { DBConversation } from "@/lib/db";
+import type { DBConversation } from "@/lib/dbTypes";
 import { isBelowLgBreakpoint } from "@/lib/breakpoints";
 
 export default function Home() {
@@ -667,7 +667,7 @@ export default function Home() {
             </button>
             <div className="flex flex-col">
               <span className="font-sans font-bold text-on-surface text-sm tracking-tight leading-none flex items-center space-x-1.5">
-                <span>Claude Artifact Studio</span>
+                <span>Artifact Studio AI</span>
                 <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-semibold border border-primary/20">
                   V2 ACTIVE
                 </span>

@@ -1,6 +1,6 @@
 {
-  "name": "Claude Artifact Studio",
-  "description": "A Claude-like AI Chat with live-streaming interactive artifacts for Word documents, PowerPoint slides, Excel spreadsheets, and single-page web applications with real-time editing and binary exports.",
+  "name": "Artifact Studio AI",
+  "description": "An AI chat app with live-streaming interactive artifacts for Word documents, PowerPoint slides, Excel spreadsheets, React projects, and single-page web applications with real-time editing and binary exports.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

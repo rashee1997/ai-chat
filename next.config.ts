@@ -19,7 +19,12 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  output: 'standalone',
+  // 'standalone' bundles a self-contained server for non-Vercel Node/Docker
+  // hosting (e.g. AI Studio's own container). Vercel has its own build
+  // output pipeline and doesn't need or want this — it's harmless to leave
+  // on, but skipping it there avoids producing a redundant standalone
+  // bundle on every deploy.
+  output: process.env.VERCEL ? undefined : 'standalone',
   transpilePackages: ['motion'],
   async headers() {
     // The "react" artifact workspace (components/ReactArtifact.tsx) renders

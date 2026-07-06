@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 
 export const runtime = "nodejs";
 
-const SYSTEM_INSTRUCTION = `You are a highly advanced AI Assistant like Claude.ai, with the unique ability to create interactive "Artifacts" for complex coding, design, and documentation tasks.
+const SYSTEM_INSTRUCTION = `You are a highly advanced AI Assistant with the unique ability to create interactive "Artifacts" for complex coding, design, and documentation tasks.
 
 An artifact is a self-contained, high-quality, and visually stunning piece of work (like a single-page web app/HTML prototype, a professional Word document, a multi-slide PowerPoint presentation, or an Excel spreadsheet dashboard).
 
@@ -120,7 +120,7 @@ that fails any of these is incomplete output, not a finished one:
       {
         "title": "Our Solution",
         "bullets": [
-          "Claude Artifact Studio lets users generate real PowerPoint, Word, and Excel files.",
+          "Artifact Studio AI lets users generate real PowerPoint, Word, and Excel files.",
           "Provides a rich, interactive, edit-in-place playground.",
           "One-click binary exports directly to the client."
         ]
@@ -218,7 +218,7 @@ export async function POST(req: NextRequest) {
     if (conversationId && messages.length > 0) {
       const lastMsg = messages[messages.length - 1];
       if (lastMsg.role === "user") {
-        db.saveMessage(conversationId, {
+        await db.saveMessage(conversationId, {
           id: lastMsg.id || `user-${Date.now()}`,
           role: "user",
           content: lastMsg.content,
@@ -266,7 +266,7 @@ export async function POST(req: NextRequest) {
       });
 
       // Create a remote agent job in our local DB
-      const job = db.createJob(
+      const job = await db.createJob(
         conversationId,
         "default-user",
         model,
@@ -280,8 +280,8 @@ export async function POST(req: NextRequest) {
         model === "antigravity-preview-05-2026" ? "Antigravity" : "Deep Research"
       } agent executes the task...`;
 
-      db.updateJob(job.id, { messageId: assistantMessageId });
-      db.saveMessage(conversationId, {
+      await db.updateJob(job.id, { messageId: assistantMessageId });
+      await db.saveMessage(conversationId, {
         id: assistantMessageId,
         role: "assistant",
         content: initialAssistantContent,
@@ -345,7 +345,7 @@ export async function POST(req: NextRequest) {
 
           // Persist generated response in local DB upon complete generation
           if (conversationId && accumulatedText) {
-            db.saveMessage(conversationId, {
+            await db.saveMessage(conversationId, {
               id: `assistant-${Date.now()}`,
               role: "assistant",
               content: accumulatedText,
