@@ -17,10 +17,25 @@ export const metadata: Metadata = {
   description: 'An interactive AI Chat with real-time streaming artifacts for HTML web apps, Word docs, PowerPoint slides, and Excel sheets.',
 };
 
+const THEME_INIT_SCRIPT = `
+(function () {
+  try {
+    var stored = localStorage.getItem('theme');
+    var theme = stored === 'light' || stored === 'dark'
+      ? stored
+      : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+  } catch (e) {}
+})();
+`;
+
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable}`} suppressHydrationWarning>
-      <body suppressHydrationWarning className="font-sans antialiased text-slate-800 bg-slate-50">{children}</body>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
+      <body suppressHydrationWarning className="font-sans antialiased bg-surface text-on-surface">{children}</body>
     </html>
   );
 }
