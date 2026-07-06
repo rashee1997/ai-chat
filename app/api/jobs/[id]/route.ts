@@ -38,7 +38,7 @@ export async function GET(
             if (interaction.steps) {
               for (const step of interaction.steps) {
                 if (step.type === "model_output") {
-                  const textContent = step.content?.find((c: any) => c.type === "text");
+                  const textContent = step.content?.find((c: any) => c.type === "text") as any;
                   if (textContent && textContent.text) {
                     fullOutput += textContent.text;
                   }
@@ -84,7 +84,7 @@ export async function GET(
             }
           } else if (interaction.status === "failed") {
             const errorMessage =
-              interaction.error?.message || "Interaction failed during remote agent execution.";
+              (interaction as any).error?.message || "Interaction failed during remote agent execution.";
 
             const messageId = job.messageId || `assistant-${Date.now()}`;
             db.saveMessage(job.conversationId, {
@@ -109,7 +109,7 @@ export async function GET(
               });
             }
           } else if (interaction.status === "requires_action") {
-            const actionPayload = interaction.requires_action || null;
+            const actionPayload = (interaction as any).requires_action || null;
             const updatedJob = db.updateJob(job.id, {
               status: "requires_action",
               resultJson: actionPayload ? JSON.stringify(actionPayload) : undefined,
@@ -167,11 +167,32 @@ export async function POST(
       },
     });
 
-    // Resume the background interaction
-    await ai.interactions.resume(job.geminiInteractionId, { input });
+    // Reconstruct webhook URI for the callback
+    const host = req.headers.get("host") || "localhost:3000";
+    const protocol = req.headers.get("x-forwarded-proto") || "http";
+    const finalProtocol =
+      host.includes("localhost") || host.includes("127.0.0.1") ? protocol : "https";
+    const baseUrl = `${finalProtocol}://${host}`;
+    const webhookUri = `${baseUrl}/api/webhooks/gemini`;
 
-    // Update the local database job status back to in_progress
+    // Fetch the previous interaction to get the environment_id
+    const previousInteraction = await ai.interactions.get(job.geminiInteractionId);
+
+    // Create a new child interaction continuing the conversation
+    const nextInteraction = await ai.interactions.create({
+      agent: job.agentType,
+      input,
+      previous_interaction_id: job.geminiInteractionId,
+      environment: previousInteraction.environment_id || "remote",
+      background: true,
+      webhook_config: {
+        uris: [webhookUri],
+      },
+    });
+
+    // Update the local database job status back to in_progress with the new interaction ID
     const updatedJob = db.updateJob(job.id, {
+      geminiInteractionId: nextInteraction.id,
       status: "in_progress",
     });
 

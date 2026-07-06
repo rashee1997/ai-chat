@@ -201,10 +201,8 @@ export async function POST(req: NextRequest) {
         input: userPrompt,
         environment: "remote",
         background: true,
-        config: {
-          webhookConfig: {
-            uris: [webhookUri],
-          },
+        webhook_config: {
+          uris: [webhookUri],
         },
       });
 

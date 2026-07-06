@@ -91,7 +91,7 @@ async function processWebhookEvent(eventType: string, payload: any, webhookId: s
       if (interaction.steps) {
         for (const step of interaction.steps) {
           if (step.type === "model_output") {
-            const textContent = step.content?.find((c: any) => c.type === "text");
+            const textContent = step.content?.find((c: any) => c.type === "text") as any;
             if (textContent && textContent.text) {
               fullOutput += textContent.text;
             }

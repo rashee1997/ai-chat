@@ -134,7 +134,7 @@ export default function Home() {
       startPolling();
     }
 
-    const startPolling = () => {
+    function startPolling() {
       if (isTerminated) return;
       if (pollInterval) clearInterval(pollInterval);
 
@@ -160,7 +160,7 @@ export default function Home() {
           console.error("Failed to poll job status:", e);
         }
       }, 4000);
-    };
+    }
   };
 
   // 1. Fetch conversations on initial mount
