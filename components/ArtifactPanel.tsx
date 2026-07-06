@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { X, History, ChevronLeft, ChevronRight, Check, RefreshCw, GitCompare } from "lucide-react";
 import { Artifact } from "@/lib/types";
 import HTMLArtifact from "./HTMLArtifact";
@@ -27,6 +27,30 @@ export default function ArtifactPanel({
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [restoredVersionNumber, setRestoredVersionNumber] = useState<number | null>(null);
   const [showDiff, setShowDiff] = useState(false);
+  const [dragOffsetY, setDragOffsetY] = useState(0);
+  const touchStartY = useRef<number | null>(null);
+
+  // Mobile-only swipe-down-to-close: track the vertical drag on the header/
+  // grab handle and dismiss the panel past a threshold, snapping back otherwise.
+  const SWIPE_CLOSE_THRESHOLD = 90;
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartY.current === null) return;
+    const delta = e.touches[0].clientY - touchStartY.current;
+    if (delta > 0) setDragOffsetY(delta);
+  };
+
+  const handleTouchEnd = () => {
+    if (dragOffsetY > SWIPE_CLOSE_THRESHOLD) {
+      onClose();
+    }
+    setDragOffsetY(0);
+    touchStartY.current = null;
+  };
 
   // Fetch all saved versions of this artifact whenever it loads or changes
   useEffect(() => {
@@ -121,9 +145,23 @@ export default function ArtifactPanel({
 
   return (
     <div
-      className="h-full flex flex-col bg-surface border-l border-border shadow-2xl transition-all duration-300 relative"
+      className="h-full flex flex-col bg-surface border-l border-border shadow-2xl relative"
       id="artifact-panel-container"
+      style={{
+        transform: dragOffsetY ? `translateY(${dragOffsetY}px)` : undefined,
+        transition: dragOffsetY ? "none" : "transform 200ms ease-out",
+      }}
     >
+      {/* Mobile-only grab handle: swipe down to dismiss the full-screen overlay */}
+      <div
+        className="hidden max-lg:flex items-center justify-center py-2 touch-none"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        <div className="w-10 h-1.5 rounded-full bg-border" aria-hidden="true" />
+      </div>
+
       {/* Premium top header bar matching the Sleek design theme */}
       <header className="h-14 flex items-center px-4 justify-between border-b border-border bg-surface-raised select-none relative z-10">
         <div className="flex items-center space-x-2.5 overflow-hidden">
@@ -177,7 +215,7 @@ export default function ArtifactPanel({
             title="Compare with original AI-generated version"
           >
             <GitCompare size={13} className={showDiff ? "text-success" : "text-on-surface-muted"} />
-            <span className="hidden sm:inline">Visual Diff</span>
+            <span className="hidden @lg/artifact:inline">Visual Diff</span>
           </button>
 
           {/* Version History Toggle Button */}
@@ -191,12 +229,12 @@ export default function ArtifactPanel({
             title="View History Versions"
           >
             <History size={13} />
-            <span className="hidden sm:inline">Versions ({versions.length || 1})</span>
+            <span className="hidden @lg/artifact:inline">Versions ({versions.length || 1})</span>
           </button>
 
           <button
             onClick={onClose}
-            className="text-on-surface-muted hover:text-on-surface transition-colors p-1.5 hover:bg-surface-sunken rounded-lg cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            className="flex items-center justify-center min-w-[44px] min-h-[44px] lg:min-w-0 lg:min-h-0 lg:p-1.5 text-on-surface-muted hover:text-on-surface transition-colors hover:bg-surface-sunken rounded-lg cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
             title="Close Panel"
           >
             <X size={15} />

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   Send,
   Sparkles,
@@ -16,8 +17,11 @@ import {
   GitBranch,
 } from "lucide-react";
 import { Message, Artifact } from "@/lib/types";
-import { parseMessageContent } from "@/lib/parser";
-import StreamingMarkdown from "@/components/StreamingMarkdown";
+import MessageRow from "@/components/MessageRow";
+
+// Conversations shorter than this render as a plain list — virtualization only
+// earns its complexity once history is long enough for it to matter.
+const VIRTUALIZE_THRESHOLD = 30;
 
 interface ChatPanelProps {
   messages: Message[];
@@ -73,7 +77,19 @@ export default function ChatPanel({
 }: ChatPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [attachedFile, setAttachedFile] = useState<{ name: string; content: string; type: string } | null>(null);
+
+  const TEXTAREA_MAX_HEIGHT = 140;
+
+  // Auto-grow the composer with content up to a max height, then let it
+  // scroll internally instead of pushing the rest of the layout around.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, TEXTAREA_MAX_HEIGHT)}px`;
+  }, [input]);
   const [isPinnedToBottom, setIsPinnedToBottom] = useState(true);
   const [showNewMessagePill, setShowNewMessagePill] = useState(false);
 
@@ -85,12 +101,28 @@ export default function ChatPanel({
     if (!el) return;
     if (isPinnedToBottom) {
       el.scrollTop = el.scrollHeight;
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing pill visibility to the scroll DOM update above
       setShowNewMessagePill(false);
     } else {
       setShowNewMessagePill(true);
     }
   }, [messages, isLoading, isPinnedToBottom]);
+
+  // Once a conversation is long enough, virtualize the settled history so we
+  // don't keep hundreds of message DOM nodes mounted. The actively-streaming
+  // tail message is always excluded and rendered in full underneath — its
+  // height changes on every token, which would otherwise fight the
+  // virtualizer's measured offsets.
+  const lastMessage = messages[messages.length - 1];
+  const isStreamingTail = isLoading && !!lastMessage && lastMessage.role === "assistant";
+  const shouldVirtualize = messages.length > VIRTUALIZE_THRESHOLD;
+  const virtualizedCount = shouldVirtualize ? (isStreamingTail ? messages.length - 1 : messages.length) : 0;
+
+  const rowVirtualizer = useVirtualizer({
+    count: virtualizedCount,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 160,
+    overscan: 6,
+  });
 
   const handleScroll = () => {
     const el = scrollRef.current;
@@ -171,44 +203,6 @@ export default function ChatPanel({
     }, 10);
   };
 
-  const getArtifactIcon = (type: string) => {
-    switch (type) {
-      case "html":
-        return <Play size={18} className="text-emerald-500" />;
-      case "word":
-        return <FileText size={18} className="text-blue-500" />;
-      case "ppt":
-        return <Presentation size={18} className="text-orange-500" />;
-      case "excel":
-        return <Table size={18} className="text-emerald-600" />;
-      case "svg":
-        return <ImageIcon size={18} className="text-purple-500" />;
-      case "mermaid":
-        return <GitBranch size={18} className="text-indigo-500" />;
-      default:
-        return <FileText size={18} className="text-on-surface-muted" />;
-    }
-  };
-
-  const getArtifactTypeName = (type: string) => {
-    switch (type) {
-      case "html":
-        return "Interactive Web App";
-      case "word":
-        return "Microsoft Word Document";
-      case "ppt":
-        return "PowerPoint Presentation";
-      case "excel":
-        return "Excel Spreadsheet Ledger";
-      case "svg":
-        return "SVG Vector Graphic";
-      case "mermaid":
-        return "Mermaid Graphic Diagram";
-      default:
-        return "Artifact Document";
-    }
-  };
-
   return (
     <div className="flex flex-col h-full bg-surface relative border-r border-border" id="chat-panel-root">
       {/* Scrollable Messages container */}
@@ -259,119 +253,61 @@ export default function ChatPanel({
           </div>
         ) : (
           /* Active Chat Stream */
-          <div className="space-y-6 max-w-3xl mx-auto" id="messages-list">
-            {messages.map((message, idx) => {
-              const isUser = message.role === "user";
-              const isLastMessage = idx === messages.length - 1;
-              const isStreamingThisMessage = isLoading && isLastMessage && !isUser;
-
-              // Parse the message to see if there is an artifact contained
-              const { conversationalText, artifact } = parseMessageContent(message.content);
-
-              return (
-                <div
-                  key={message.id}
-                  className={`flex space-x-4 ${isUser ? "justify-end" : "justify-start"}`}
-                >
-                  {/* Avatar */}
-                  {!isUser && (
-                    <div className="flex-shrink-0 w-8 h-8 rounded-md bg-primary text-on-primary flex items-center justify-center font-bold text-xs select-none shadow-sm">
-                      AI
-                    </div>
-                  )}
-
-                  {/* Message Bubble Container */}
-                  <div className={`max-w-[85%] space-y-2 ${isUser ? "text-right" : "text-left"}`}>
-                    {/* Username indicator */}
-                    <div className="text-[10px] text-on-surface-muted font-semibold uppercase tracking-wider select-none">
-                      {isUser ? "You" : "Claude Assistant"}
-                    </div>
-
-                    {/* Conversational bubble */}
-                    <div
-                      className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
-                        isUser
-                          ? "bg-on-surface text-surface font-medium shadow-sm text-left inline-block"
-                          : "bg-surface-raised text-on-surface border border-border shadow-sm text-left block"
-                      }`}
-                    >
-                      {/* Render conversational paragraphs: plain text for the user
-                          (typed, not streamed, so no incomplete-markdown risk),
-                          streaming-safe markdown for the assistant. */}
-                      {conversationalText ? (
-                        isUser ? (
-                          <div className="whitespace-pre-wrap">{conversationalText}</div>
-                        ) : (
-                          <StreamingMarkdown content={conversationalText} isStreaming={isStreamingThisMessage} />
-                        )
-                      ) : (
-                        !isUser && artifact && (
-                          <div className="text-on-surface-muted italic text-xs flex items-center space-x-1.5">
-                            <Loader2 size={12} className="animate-spin text-primary" />
-                            <span>Generating artifact workspace...</span>
-                          </div>
-                        )
-                      )}
-                    </div>
-
-                    {/* Inline Artifact Badge (If found) */}
-                    {artifact && (
+          <div className="max-w-3xl mx-auto" id="messages-list">
+            {shouldVirtualize ? (
+              <>
+                <div style={{ height: rowVirtualizer.getTotalSize(), width: "100%", position: "relative" }}>
+                  {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                    const message = messages[virtualRow.index];
+                    return (
                       <div
-                        onClick={() => onSelectArtifact(artifact)}
-                        className={`p-3 bg-surface-raised border rounded-xl flex items-center justify-between cursor-pointer shadow-sm transition-all duration-200 text-left ${
-                          activeArtifactId === artifact.id
-                            ? "border-primary ring-1 ring-primary/20"
-                            : "border-border hover:border-on-surface-muted/40"
-                        }`}
-                        id={`chat-artifact-badge-${artifact.id}`}
+                        key={message.id}
+                        data-index={virtualRow.index}
+                        ref={rowVirtualizer.measureElement}
+                        className="pb-6"
+                        style={{
+                          position: "absolute",
+                          top: 0,
+                          left: 0,
+                          width: "100%",
+                          transform: `translateY(${virtualRow.start}px)`,
+                        }}
                       >
-                        <div className="flex items-center space-x-3 overflow-hidden">
-                          <div className={`p-2 rounded-lg flex-shrink-0 ${
-                            artifact.type === "html" ? "bg-emerald-50 text-emerald-600" :
-                            artifact.type === "word" ? "bg-blue-50 text-blue-600" :
-                            artifact.type === "ppt" ? "bg-orange-50 text-orange-600" :
-                            artifact.type === "svg" ? "bg-purple-50 text-purple-600" :
-                            artifact.type === "mermaid" ? "bg-indigo-50 text-indigo-600" :
-                            "bg-green-50 text-green-600"
-                          }`}>
-                            {getArtifactIcon(artifact.type)}
-                          </div>
-                          <div className="overflow-hidden">
-                            <div className="text-xs font-semibold text-on-surface truncate tracking-tight">
-                              {artifact.title}
-                            </div>
-                            <div className="text-[10px] text-on-surface-muted font-medium">
-                              {getArtifactTypeName(artifact.type)} • {artifact.isComplete ? "Click to open view" : "In progress..."}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center space-x-1.5 text-xs font-semibold px-2.5 py-1 bg-surface hover:bg-surface-sunken rounded-lg border border-border text-on-surface transition-colors flex-shrink-0">
-                          {artifact.isComplete ? (
-                            <>
-                              <span>View</span>
-                              <ArrowRight size={10} className="text-on-surface-muted" />
-                            </>
-                          ) : (
-                            <div className="flex items-center space-x-1 text-primary">
-                              <Loader2 size={10} className="animate-spin" />
-                              <span className="text-[10px]">Streaming</span>
-                            </div>
-                          )}
-                        </div>
+                        <MessageRow
+                          message={message}
+                          isStreaming={false}
+                          onSelectArtifact={onSelectArtifact}
+                          activeArtifactId={activeArtifactId}
+                        />
                       </div>
-                    )}
-                  </div>
-
-                  {/* User Avatar */}
-                  {isUser && (
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-border text-on-surface-muted flex items-center justify-center font-bold text-xs select-none shadow-sm">
-                      U
-                    </div>
-                  )}
+                    );
+                  })}
                 </div>
-              );
-            })}
+
+                {/* The actively-streaming tail message is excluded from the
+                    virtualizer above and always rendered here in full. */}
+                {isStreamingTail && (
+                  <MessageRow
+                    message={lastMessage}
+                    isStreaming
+                    onSelectArtifact={onSelectArtifact}
+                    activeArtifactId={activeArtifactId}
+                  />
+                )}
+              </>
+            ) : (
+              <div className="space-y-6">
+                {messages.map((message, idx) => (
+                  <MessageRow
+                    key={message.id}
+                    message={message}
+                    isStreaming={isLoading && idx === messages.length - 1 && message.role === "assistant"}
+                    onSelectArtifact={onSelectArtifact}
+                    activeArtifactId={activeArtifactId}
+                  />
+                ))}
+              </div>
+            )}
 
             {/* Streaming Message Indicator */}
             {isLoading && messages[messages.length - 1]?.role === "user" && (
@@ -455,6 +391,7 @@ export default function ChatPanel({
             </button>
 
             <textarea
+              ref={textareaRef}
               value={input}
               onChange={(e) => onInputChange(e.target.value)}
               onKeyDown={(e) => {
@@ -464,7 +401,7 @@ export default function ChatPanel({
                 }
               }}
               placeholder="Ask me to create a document, code an SVG diagram, or design flowcharts..."
-              className="w-full p-4 pl-12 pr-12 bg-surface-raised border border-border rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm resize-none focus:border-primary min-h-[44px] h-[52px] max-h-[140px] overflow-y-auto transition-all"
+              className="w-full p-4 pl-12 pr-12 bg-surface-raised border border-border rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm resize-none focus:border-primary min-h-[44px] max-h-[140px] overflow-y-auto transition-all"
               rows={1}
               disabled={isLoading}
               id="chat-textarea"

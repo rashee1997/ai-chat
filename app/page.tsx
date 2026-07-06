@@ -189,6 +189,33 @@ export default function Home() {
     fetchConversations();
   }, []);
 
+  // Cmd/Ctrl+K: open the sidebar (if collapsed) and focus conversation search.
+  // Escape: close the mobile sidebar drawer (a no-op on desktop/when already closed).
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setIsSidebarOpen(true);
+        requestAnimationFrame(() => {
+          document.getElementById("conversation-search")?.focus();
+        });
+      } else if (e.key === "Escape" && window.innerWidth < 1024) {
+        setIsSidebarOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // The sidebar defaults to open for the persistent desktop column, but below
+  // `lg` it renders as an overlay drawer — correct that on mount so a phone
+  // doesn't load with the drawer already covering the screen.
+  useEffect(() => {
+    if (window.innerWidth < 1024) {
+      setIsSidebarOpen(false);
+    }
+  }, []);
+
   // 2. Select conversation and fetch its messages
   const handleSelectConversation = async (id: string) => {
     setActiveConversationId(id);
@@ -572,25 +599,49 @@ export default function Home() {
     }
   };
 
+  // Below the `lg` breakpoint the sidebar is an overlay drawer, not a
+  // persistent column, so picking a conversation should close it again.
+  const closeSidebarOnMobile = () => {
+    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+      setIsSidebarOpen(false);
+    }
+  };
+
   return (
     <div className="flex h-screen w-screen bg-surface text-on-surface overflow-hidden" id="app-root-viewport">
-      {/* 1. Left Sidebar Panels */}
+      {/* 1. Left Sidebar Panels — persistent column at lg: and up, an
+          off-canvas overlay drawer with backdrop below that. */}
       {isSidebarOpen && (
-        <Sidebar
-          conversations={conversations}
-          activeId={activeConversationId}
-          onSelect={handleSelectConversation}
-          onCreate={handleCreateConversation}
-          onUpdate={handleUpdateConversation}
-          onDelete={handleDeleteConversation}
-          selectedModel={selectedModel}
-          onModelChange={(model) => {
-            setSelectedModel(model);
-            if (activeConversationId) {
-              handleUpdateConversation(activeConversationId, { model });
-            }
-          }}
-        />
+        <>
+          <div
+            className="fixed inset-0 bg-black/40 z-30 lg:hidden"
+            onClick={() => setIsSidebarOpen(false)}
+            aria-hidden="true"
+          />
+          <div className="fixed inset-y-0 left-0 z-40 lg:static lg:z-auto">
+            <Sidebar
+              conversations={conversations}
+              activeId={activeConversationId}
+              onSelect={(id) => {
+                handleSelectConversation(id);
+                closeSidebarOnMobile();
+              }}
+              onCreate={() => {
+                handleCreateConversation();
+                closeSidebarOnMobile();
+              }}
+              onUpdate={handleUpdateConversation}
+              onDelete={handleDeleteConversation}
+              selectedModel={selectedModel}
+              onModelChange={(model) => {
+                setSelectedModel(model);
+                if (activeConversationId) {
+                  handleUpdateConversation(activeConversationId, { model });
+                }
+              }}
+            />
+          </div>
+        </>
       )}
 
       {/* 2. Main Content Layout Area */}
