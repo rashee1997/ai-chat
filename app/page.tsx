@@ -5,6 +5,7 @@ import { Sparkles, RefreshCw, PanelLeftClose, PanelLeft, Info } from "lucide-rea
 import Sidebar from "@/components/Sidebar";
 import ChatPanel from "@/components/ChatPanel";
 import ArtifactPanel from "@/components/ArtifactPanel";
+import ThemeToggle from "@/components/ThemeToggle";
 import { Message, Artifact } from "@/lib/types";
 import { parseMessageContent } from "@/lib/parser";
 import { DBConversation } from "@/lib/db";
@@ -572,7 +573,7 @@ export default function Home() {
   };
 
   return (
-    <div className="flex h-screen w-screen bg-[#fdfdfd] text-[#1a1a1a] overflow-hidden" id="app-root-viewport">
+    <div className="flex h-screen w-screen bg-surface text-on-surface overflow-hidden" id="app-root-viewport">
       {/* 1. Left Sidebar Panels */}
       {isSidebarOpen && (
         <Sidebar
@@ -595,32 +596,33 @@ export default function Home() {
       {/* 2. Main Content Layout Area */}
       <div className="flex-1 flex flex-col min-w-0" id="main-layout-container">
         {/* Universal Top Navigation Header */}
-        <header className="bg-white border-b border-[#ececec] px-6 py-3.5 flex items-center justify-between shadow-sm z-15 select-none" id="main-header">
+        <header className="bg-surface-raised border-b border-border px-6 py-3.5 flex items-center justify-between shadow-[var(--shadow-sm)] z-15 select-none" id="main-header">
           <div className="flex items-center space-x-3">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-1.5 hover:bg-[#f3f4f6] rounded-lg border border-[#e0e0e0] text-[#555] hover:text-[#1a1a1a] cursor-pointer transition-colors shadow-sm mr-1"
+              className="p-1.5 hover:bg-surface-sunken rounded-lg border border-border text-on-surface-muted hover:text-on-surface cursor-pointer transition-colors shadow-[var(--shadow-sm)] mr-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
               title={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
             >
               {isSidebarOpen ? <PanelLeftClose size={14} /> : <PanelLeft size={14} />}
             </button>
             <div className="flex flex-col">
-              <span className="font-sans font-bold text-[#1a1a1a] text-sm tracking-tight leading-none flex items-center space-x-1.5">
+              <span className="font-sans font-bold text-on-surface text-sm tracking-tight leading-none flex items-center space-x-1.5">
                 <span>Claude Artifact Studio</span>
-                <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-semibold border border-blue-100">
+                <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-semibold border border-primary/20">
                   V2 ACTIVE
                 </span>
               </span>
-              <span className="text-[10px] text-[#8e8e8e] font-semibold tracking-wider font-mono mt-0.5 uppercase">
+              <span className="text-[10px] text-on-surface-muted font-semibold tracking-wider font-mono mt-0.5 uppercase">
                 Professional Plan Workspace
               </span>
             </div>
           </div>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3">
+            <ThemeToggle />
             <button
               onClick={handleClearWorkspace}
-              className="flex items-center space-x-1.5 text-xs text-red-600 hover:text-white hover:bg-red-600 bg-white border border-red-200 hover:border-red-600 px-3 py-1.5 rounded-lg shadow-sm transition-all cursor-pointer font-bold"
+              className="flex items-center space-x-1.5 text-xs text-danger hover:text-white hover:bg-danger bg-surface-raised border border-danger/30 hover:border-danger px-3 py-1.5 rounded-lg shadow-[var(--shadow-sm)] transition-all cursor-pointer font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
               title="Wipe database completely"
             >
               <RefreshCw size={13} />
@@ -631,9 +633,12 @@ export default function Home() {
 
         {/* Split Main Screen Content Panel */}
         <div className="flex-1 flex overflow-hidden relative" id="split-screen-container">
-          {/* Left Column: Chat panel */}
+          {/* Left Column: Chat panel. `@container` lets children (ChatPanel) use
+              @container queries keyed to this column's own width, since it
+              resizes independently of the viewport whenever the artifact
+              panel opens/closes. */}
           <div
-            className={`h-full transition-all duration-300 ${
+            className={`h-full transition-all duration-300 @container/chat ${
               isArtifactPanelOpen ? "w-full lg:w-[42%]" : "w-full"
             }`}
             id="chat-column-wrapper"
@@ -652,7 +657,7 @@ export default function Home() {
           {/* Right Column: Artifact panel (Slid-in screen) */}
           {isArtifactPanelOpen && activeArtifact && (
             <div
-              className="absolute lg:static top-0 right-0 w-full lg:w-[58%] h-full z-20 lg:z-auto shadow-2xl lg:shadow-none animate-in fade-in slide-in-from-right duration-200"
+              className="absolute lg:static top-0 right-0 w-full lg:w-[58%] h-full z-20 lg:z-auto shadow-2xl lg:shadow-none animate-in fade-in slide-in-from-right duration-200 @container/artifact"
               id="artifact-column-wrapper"
             >
               <ArtifactPanel

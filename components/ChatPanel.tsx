@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Message, Artifact } from "@/lib/types";
 import { parseMessageContent } from "@/lib/parser";
+import StreamingMarkdown from "@/components/StreamingMarkdown";
 
 interface ChatPanelProps {
   messages: Message[];
@@ -73,13 +74,40 @@ export default function ChatPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [attachedFile, setAttachedFile] = useState<{ name: string; content: string; type: string } | null>(null);
+  const [isPinnedToBottom, setIsPinnedToBottom] = useState(true);
+  const [showNewMessagePill, setShowNewMessagePill] = useState(false);
 
-  // Auto-scroll to bottom of chat
+  // Pin to bottom only while the user is already at the bottom; if they've
+  // scrolled up to read history, don't yank them back down — surface a
+  // "New message" pill instead.
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const el = scrollRef.current;
+    if (!el) return;
+    if (isPinnedToBottom) {
+      el.scrollTop = el.scrollHeight;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing pill visibility to the scroll DOM update above
+      setShowNewMessagePill(false);
+    } else {
+      setShowNewMessagePill(true);
     }
-  }, [messages, isLoading]);
+  }, [messages, isLoading, isPinnedToBottom]);
+
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const atBottom = distanceFromBottom < 96;
+    setIsPinnedToBottom(atBottom);
+    if (atBottom) setShowNewMessagePill(false);
+  };
+
+  const jumpToBottom = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    setIsPinnedToBottom(true);
+    setShowNewMessagePill(false);
+  };
 
   const handleStarterClick = (promptText: string) => {
     onInputChange(promptText);
@@ -158,7 +186,7 @@ export default function ChatPanel({
       case "mermaid":
         return <GitBranch size={18} className="text-indigo-500" />;
       default:
-        return <FileText size={18} className="text-slate-500" />;
+        return <FileText size={18} className="text-on-surface-muted" />;
     }
   };
 
@@ -182,21 +210,27 @@ export default function ChatPanel({
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#f9f9f8] relative border-r border-[#ececec]" id="chat-panel-root">
+    <div className="flex flex-col h-full bg-surface relative border-r border-border" id="chat-panel-root">
       {/* Scrollable Messages container */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 select-text" ref={scrollRef} id="chat-messages-container">
+      <div className="flex-1 relative overflow-hidden">
+      <div
+        className="h-full overflow-y-auto p-6 space-y-6 select-text"
+        ref={scrollRef}
+        onScroll={handleScroll}
+        id="chat-messages-container"
+      >
         {messages.length === 0 ? (
           /* Empty state */
           <div className="h-full flex flex-col justify-center items-center max-w-lg mx-auto text-center space-y-8 py-12 select-none">
-            <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-white shadow-sm border border-[#ececec] text-slate-800">
+            <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-surface-raised shadow-sm border border-border text-on-surface">
               <Sparkles size={26} className="text-emerald-500 animate-pulse" />
             </div>
 
             <div className="space-y-3">
-              <h1 className="font-sans font-bold text-2xl text-[#1a1a1a] tracking-tight leading-none">
+              <h1 className="font-sans font-bold text-2xl text-on-surface tracking-tight leading-none">
                 Claude Artifact Studio
               </h1>
-              <p className="text-xs text-[#8e8e8e] leading-relaxed max-w-sm">
+              <p className="text-xs text-on-surface-muted leading-relaxed max-w-sm">
                 Generate and edit stunning interactive codebases, spreadsheets, PowerPoint presentations, vector images, and diagram charts instantly.
               </p>
             </div>
@@ -207,17 +241,17 @@ export default function ChatPanel({
                 <button
                   key={pIdx}
                   onClick={() => handleStarterClick(prompt.text)}
-                  className="flex items-center justify-between p-3.5 bg-white hover:bg-[#fcfcfc] border border-[#ececec] hover:border-[#dcdcdc] rounded-xl text-xs text-left text-slate-700 font-medium transition-all shadow-sm group cursor-pointer"
+                  className="flex items-center justify-between p-3.5 bg-surface-raised hover:bg-surface-sunken border border-border hover:border-on-surface-muted/40 rounded-xl text-xs text-left text-on-surface font-medium transition-all shadow-sm group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                 >
                   <div className="flex items-center space-x-2.5 overflow-hidden">
-                    <span className="p-1.5 bg-[#f3f4f6] rounded-lg flex-shrink-0">{prompt.icon}</span>
-                    <span className="text-[#374151] truncate">{prompt.text}</span>
+                    <span className="p-1.5 bg-surface-sunken rounded-lg flex-shrink-0">{prompt.icon}</span>
+                    <span className="text-on-surface truncate">{prompt.text}</span>
                   </div>
                   <div className="flex items-center space-x-1 flex-shrink-0">
-                    <span className="text-[9px] bg-[#f3f4f6] text-[#8e8e8e] px-1.5 py-0.5 rounded font-mono uppercase tracking-wider group-hover:bg-[#ececec]">
+                    <span className="text-[9px] bg-surface-sunken text-on-surface-muted px-1.5 py-0.5 rounded font-mono uppercase tracking-wider group-hover:bg-surface-sunken/70">
                       {prompt.type.split(" ")[0]}
                     </span>
-                    <ArrowRight size={10} className="text-[#8e8e8e] group-hover:translate-x-1 transition-transform" />
+                    <ArrowRight size={10} className="text-on-surface-muted group-hover:translate-x-1 transition-transform" />
                   </div>
                 </button>
               ))}
@@ -226,9 +260,11 @@ export default function ChatPanel({
         ) : (
           /* Active Chat Stream */
           <div className="space-y-6 max-w-3xl mx-auto" id="messages-list">
-            {messages.map((message) => {
+            {messages.map((message, idx) => {
               const isUser = message.role === "user";
-              
+              const isLastMessage = idx === messages.length - 1;
+              const isStreamingThisMessage = isLoading && isLastMessage && !isUser;
+
               // Parse the message to see if there is an artifact contained
               const { conversationalText, artifact } = parseMessageContent(message.content);
 
@@ -239,7 +275,7 @@ export default function ChatPanel({
                 >
                   {/* Avatar */}
                   {!isUser && (
-                    <div className="flex-shrink-0 w-8 h-8 rounded-md bg-[#6d28d9] text-white flex items-center justify-center font-bold text-xs select-none shadow-sm">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-md bg-primary text-on-primary flex items-center justify-center font-bold text-xs select-none shadow-sm">
                       AI
                     </div>
                   )}
@@ -247,7 +283,7 @@ export default function ChatPanel({
                   {/* Message Bubble Container */}
                   <div className={`max-w-[85%] space-y-2 ${isUser ? "text-right" : "text-left"}`}>
                     {/* Username indicator */}
-                    <div className="text-[10px] text-[#8e8e8e] font-semibold uppercase tracking-wider select-none">
+                    <div className="text-[10px] text-on-surface-muted font-semibold uppercase tracking-wider select-none">
                       {isUser ? "You" : "Claude Assistant"}
                     </div>
 
@@ -255,19 +291,23 @@ export default function ChatPanel({
                     <div
                       className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
                         isUser
-                          ? "bg-[#1a1a1a] text-white font-medium shadow-sm text-left inline-block"
-                          : "bg-white text-[#374151] border border-[#ececec] shadow-sm text-left block"
+                          ? "bg-on-surface text-surface font-medium shadow-sm text-left inline-block"
+                          : "bg-surface-raised text-on-surface border border-border shadow-sm text-left block"
                       }`}
                     >
-                      {/* Render conversational paragraphs */}
+                      {/* Render conversational paragraphs: plain text for the user
+                          (typed, not streamed, so no incomplete-markdown risk),
+                          streaming-safe markdown for the assistant. */}
                       {conversationalText ? (
-                        <div className="whitespace-pre-wrap">
-                          {conversationalText}
-                        </div>
+                        isUser ? (
+                          <div className="whitespace-pre-wrap">{conversationalText}</div>
+                        ) : (
+                          <StreamingMarkdown content={conversationalText} isStreaming={isStreamingThisMessage} />
+                        )
                       ) : (
                         !isUser && artifact && (
-                          <div className="text-[#8e8e8e] italic text-xs flex items-center space-x-1.5">
-                            <Loader2 size={12} className="animate-spin text-indigo-600" />
+                          <div className="text-on-surface-muted italic text-xs flex items-center space-x-1.5">
+                            <Loader2 size={12} className="animate-spin text-primary" />
                             <span>Generating artifact workspace...</span>
                           </div>
                         )
@@ -278,10 +318,10 @@ export default function ChatPanel({
                     {artifact && (
                       <div
                         onClick={() => onSelectArtifact(artifact)}
-                        className={`p-3 bg-white border rounded-xl flex items-center justify-between cursor-pointer shadow-sm transition-all duration-200 text-left ${
+                        className={`p-3 bg-surface-raised border rounded-xl flex items-center justify-between cursor-pointer shadow-sm transition-all duration-200 text-left ${
                           activeArtifactId === artifact.id
-                            ? "border-[#6d28d9] ring-1 ring-[#6d28d9]/20"
-                            : "border-[#ececec] hover:border-[#dcdcdc]"
+                            ? "border-primary ring-1 ring-primary/20"
+                            : "border-border hover:border-on-surface-muted/40"
                         }`}
                         id={`chat-artifact-badge-${artifact.id}`}
                       >
@@ -297,23 +337,23 @@ export default function ChatPanel({
                             {getArtifactIcon(artifact.type)}
                           </div>
                           <div className="overflow-hidden">
-                            <div className="text-xs font-semibold text-[#1a1a1a] truncate tracking-tight">
+                            <div className="text-xs font-semibold text-on-surface truncate tracking-tight">
                               {artifact.title}
                             </div>
-                            <div className="text-[10px] text-[#8e8e8e] font-medium">
+                            <div className="text-[10px] text-on-surface-muted font-medium">
                               {getArtifactTypeName(artifact.type)} • {artifact.isComplete ? "Click to open view" : "In progress..."}
                             </div>
                           </div>
                         </div>
 
-                        <div className="flex items-center space-x-1.5 text-xs font-semibold px-2.5 py-1 bg-[#f9f9f8] hover:bg-[#ececeb] rounded-lg border border-[#e0e0e0] text-[#374151] transition-colors flex-shrink-0">
+                        <div className="flex items-center space-x-1.5 text-xs font-semibold px-2.5 py-1 bg-surface hover:bg-surface-sunken rounded-lg border border-border text-on-surface transition-colors flex-shrink-0">
                           {artifact.isComplete ? (
                             <>
                               <span>View</span>
-                              <ArrowRight size={10} className="text-[#8e8e8e]" />
+                              <ArrowRight size={10} className="text-on-surface-muted" />
                             </>
                           ) : (
-                            <div className="flex items-center space-x-1 text-[#6d28d9]">
+                            <div className="flex items-center space-x-1 text-primary">
                               <Loader2 size={10} className="animate-spin" />
                               <span className="text-[10px]">Streaming</span>
                             </div>
@@ -325,7 +365,7 @@ export default function ChatPanel({
 
                   {/* User Avatar */}
                   {isUser && (
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#e0e0e0] text-[#555] flex items-center justify-center font-bold text-xs select-none shadow-sm">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-border text-on-surface-muted flex items-center justify-center font-bold text-xs select-none shadow-sm">
                       U
                     </div>
                   )}
@@ -336,16 +376,16 @@ export default function ChatPanel({
             {/* Streaming Message Indicator */}
             {isLoading && messages[messages.length - 1]?.role === "user" && (
               <div className="flex space-x-4 items-start animate-pulse">
-                <div className="flex-shrink-0 w-8 h-8 rounded-md bg-[#6d28d9] text-white flex items-center justify-center font-bold text-xs select-none shadow-sm">
+                <div className="flex-shrink-0 w-8 h-8 rounded-md bg-primary text-on-primary flex items-center justify-center font-bold text-xs select-none shadow-sm">
                   AI
                 </div>
                 <div className="space-y-2 w-full">
-                  <div className="text-[10px] text-[#8e8e8e] font-semibold uppercase tracking-wider select-none">
+                  <div className="text-[10px] text-on-surface-muted font-semibold uppercase tracking-wider select-none">
                     Claude Assistant
                   </div>
-                  <div className="px-4 py-3 bg-white border border-[#ececec] rounded-2xl shadow-sm max-w-sm flex items-center space-x-2">
-                    <Loader2 size={14} className="animate-spin text-slate-500" />
-                    <span className="text-xs text-slate-500 font-medium">Drafting workspace...</span>
+                  <div className="px-4 py-3 bg-surface-raised border border-border rounded-2xl shadow-sm max-w-sm flex items-center space-x-2">
+                    <Loader2 size={14} className="animate-spin text-on-surface-muted" />
+                    <span className="text-xs text-on-surface-muted font-medium">Drafting workspace...</span>
                   </div>
                 </div>
               </div>
@@ -354,28 +394,39 @@ export default function ChatPanel({
         )}
       </div>
 
+      {showNewMessagePill && (
+        <button
+          onClick={jumpToBottom}
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-3 py-2 min-h-[44px] bg-on-surface text-surface text-xs font-semibold rounded-full shadow-[var(--shadow-md)] cursor-pointer hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        >
+          <span>New message</span>
+          <span aria-hidden="true">↓</span>
+        </button>
+      )}
+      </div>
+
       {/* Input panel block */}
-      <div className="p-6 bg-white border-t border-[#ececec]" id="chat-input-container">
+      <div className="p-6 bg-surface-raised border-t border-border" id="chat-input-container">
         <form onSubmit={handleLocalSubmit} className="max-w-2xl mx-auto relative" id="chat-input-form">
           
           {/* File Upload Attachment Preview Strip */}
           {attachedFile && (
-            <div className="flex items-center space-x-2 p-2 bg-[#f9f9f8] border border-[#ececec] rounded-xl mb-2 max-w-xs relative animate-in fade-in slide-in-from-bottom-2 duration-150 shadow-sm">
+            <div className="flex items-center space-x-2 p-2 bg-surface border border-border rounded-xl mb-2 max-w-xs relative animate-in fade-in slide-in-from-bottom-2 duration-150 shadow-sm">
               {attachedFile.type.startsWith("image/") ? (
-                <img src={attachedFile.content} className="w-9 h-9 object-cover rounded-lg border border-[#ececec]" />
+                <img src={attachedFile.content} className="w-9 h-9 object-cover rounded-lg border border-border" />
               ) : (
                 <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><FileText size={16} /></div>
               )}
               <div className="flex-1 min-w-0 pr-6">
-                <div className="text-xs font-bold text-slate-800 truncate">{attachedFile.name}</div>
-                <div className="text-[9px] text-[#8e8e8e] uppercase font-semibold">
+                <div className="text-xs font-bold text-on-surface truncate">{attachedFile.name}</div>
+                <div className="text-[9px] text-on-surface-muted uppercase font-semibold">
                   {attachedFile.type.split("/")[1] || "document"}
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setAttachedFile(null)}
-                className="absolute top-1 right-1 p-1 text-slate-400 hover:text-slate-600 hover:bg-[#ececec] rounded-full cursor-pointer"
+                className="absolute top-1 right-1 p-1 text-on-surface-muted hover:text-on-surface hover:bg-surface-sunken rounded-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
               >
                 <X size={12} />
               </button>
@@ -397,7 +448,7 @@ export default function ChatPanel({
               type="button"
               onClick={handleFileUploadClick}
               disabled={isLoading}
-              className="absolute left-3 bottom-3 p-2 text-slate-400 hover:text-slate-600 hover:bg-[#f3f4f6] transition-colors rounded-xl cursor-pointer"
+              className="absolute left-3 bottom-3 p-2 text-on-surface-muted hover:text-on-surface hover:bg-surface-sunken transition-colors rounded-xl cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
               title="Attach File / Document (CSV, Image, PDF, Code)"
             >
               <Paperclip size={16} />
@@ -413,7 +464,7 @@ export default function ChatPanel({
                 }
               }}
               placeholder="Ask me to create a document, code an SVG diagram, or design flowcharts..."
-              className="w-full p-4 pl-12 pr-12 bg-white border border-[#e0e0e0] rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/10 text-sm resize-none focus:border-blue-500 min-h-[44px] h-[52px] max-h-[140px] overflow-y-auto transition-all"
+              className="w-full p-4 pl-12 pr-12 bg-surface-raised border border-border rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm resize-none focus:border-primary min-h-[44px] h-[52px] max-h-[140px] overflow-y-auto transition-all"
               rows={1}
               disabled={isLoading}
               id="chat-textarea"
@@ -422,7 +473,7 @@ export default function ChatPanel({
             <button
               type="submit"
               disabled={isLoading || (!input.trim() && !attachedFile)}
-              className="absolute right-3 bottom-3 p-2 bg-[#1a1a1a] hover:bg-[#333] text-white disabled:opacity-40 disabled:hover:bg-[#1a1a1a] transition-all rounded-xl cursor-pointer shadow-sm animate-in zoom-in-50"
+              className="absolute right-3 bottom-3 p-2 bg-on-surface hover:opacity-90 text-surface disabled:opacity-40 transition-all rounded-xl cursor-pointer shadow-sm animate-in zoom-in-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
               id="send-message-btn"
             >
               <Send size={14} />
@@ -430,7 +481,7 @@ export default function ChatPanel({
           </div>
         </form>
 
-        <p className="text-center text-[10px] text-[#8e8e8e] mt-3 select-none">
+        <p className="text-center text-[10px] text-on-surface-muted mt-3 select-none">
           Artifacts let you dynamically preview documents, presentations, spreadsheets, flowcharts, and SVG vectors directly.
         </p>
       </div>

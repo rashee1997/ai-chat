@@ -1,6 +1,170 @@
 @import "tailwindcss";
 
+/* Also scan streamdown's compiled output for Tailwind class names it uses
+   internally (code block controls, mermaid zoom UI, link-safety modal), so
+   those utilities get generated and pick up our tokens below. */
+@source "../node_modules/streamdown/dist/**/*.js";
+
+/* ---------------------------------------------------------------------------
+ * Design tokens — single source of truth for color, type, spacing, radius.
+ * Light values at :root, dark values under [data-theme="dark"]. Components
+ * should consume these via Tailwind utilities (bg-surface, text-on-surface,
+ * border-border, rounded-md, ...) rather than hardcoded hex/px values.
+ * See DESIGN.md for the rationale behind the palette + scale choices.
+ * ------------------------------------------------------------------------- */
+
+:root {
+  color-scheme: light;
+
+  /* Color roles ("Workshop": paper/ink surfaces + one violet accent) */
+  --surface: #fdfdfc;
+  --surface-raised: #ffffff;
+  --surface-sunken: #f3f3f1;
+  --on-surface: #1a1a1a;
+  --on-surface-muted: #78787a;
+  --border: #e6e6e2;
+  --primary: #6d28d9;
+  --primary-hover: #5b21b6;
+  --on-primary: #ffffff;
+  --success: #059669;
+  --success-surface: #ecfdf5;
+  --warning: #d97706;
+  --warning-surface: #fffbeb;
+  --danger: #dc2626;
+  --danger-surface: #fef2f2;
+
+  /* Spacing scale */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-fluid-md: clamp(1rem, 0.85rem + 0.75vw, 1.5rem);
+  --space-fluid-lg: clamp(1.5rem, 1.2rem + 1.5vw, 2.5rem);
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+  --shadow-md: 0 4px 16px -4px rgb(0 0 0 / 0.1);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --surface: #161618;
+  --surface-raised: #1e1e21;
+  --surface-sunken: #101012;
+  --on-surface: #f1f1ef;
+  --on-surface-muted: #97979c;
+  --border: #2b2b2f;
+  --primary: #a78bfa;
+  --primary-hover: #c4b5fd;
+  --on-primary: #161618;
+  --success: #34d399;
+  --success-surface: #062a20;
+  --warning: #fbbf24;
+  --warning-surface: #2b1d05;
+  --danger: #f87171;
+  --danger-surface: #2b0e0e;
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --shadow-md: 0 4px 20px -4px rgb(0 0 0 / 0.55);
+}
+
+/* Default to the OS preference until the user picks explicitly (page.tsx
+   stamps data-theme as soon as it mounts, reading localStorage first). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface: #161618;
+    --surface-raised: #1e1e21;
+    --surface-sunken: #101012;
+    --on-surface: #f1f1ef;
+    --on-surface-muted: #97979c;
+    --border: #2b2b2f;
+    --primary: #a78bfa;
+    --primary-hover: #c4b5fd;
+    --on-primary: #161618;
+    --success: #34d399;
+    --success-surface: #062a20;
+    --warning: #fbbf24;
+    --warning-surface: #2b1d05;
+    --danger: #f87171;
+    --danger-surface: #2b0e0e;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+    --shadow-md: 0 4px 20px -4px rgb(0 0 0 / 0.55);
+  }
+}
+
 @theme {
   --font-sans: var(--font-sans), sans-serif;
   --font-display: var(--font-display), sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Semantic color utilities: bg-surface, text-on-surface, border-border, ... */
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-on-surface: var(--on-surface);
+  --color-on-surface-muted: var(--on-surface-muted);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-on-primary: var(--on-primary);
+  --color-success: var(--success);
+  --color-success-surface: var(--success-surface);
+  --color-warning: var(--warning);
+  --color-warning-surface: var(--warning-surface);
+  --color-danger: var(--danger);
+  --color-danger-surface: var(--danger-surface);
+
+  /* shadcn-style aliases so Streamdown's own internal classes
+     (bg-background, text-muted-foreground, border-border, bg-primary, ...)
+     resolve through the same tokens instead of shipping their own look. */
+  --color-background: var(--surface-raised);
+  --color-foreground: var(--on-surface);
+  --color-muted: var(--surface-sunken);
+  --color-muted-foreground: var(--on-surface-muted);
+  --color-primary-foreground: var(--on-primary);
+
+  /* Fluid type scale — rem min/max so browser zoom still works */
+  --text-xs: clamp(0.6875rem, 0.66rem + 0.1vw, 0.75rem);
+  --text-sm: clamp(0.8125rem, 0.78rem + 0.15vw, 0.875rem);
+  --text-base: clamp(0.875rem, 0.83rem + 0.2vw, 1rem);
+  --text-lg: clamp(1rem, 0.94rem + 0.3vw, 1.125rem);
+  --text-xl: clamp(1.125rem, 1.03rem + 0.4vw, 1.375rem);
+  --text-2xl: clamp(1.375rem, 1.22rem + 0.6vw, 1.75rem);
+  --text-3xl: clamp(1.75rem, 1.5rem + 1vw, 2.25rem);
+
+  --spacing-fluid-md: var(--space-fluid-md);
+  --spacing-fluid-lg: var(--space-fluid-lg);
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 1rem;
+
+  --shadow-token-sm: var(--shadow-sm);
+  --shadow-token-md: var(--shadow-md);
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background: var(--surface);
+  color: var(--on-surface);
+}
+
+/* Respect prefers-reduced-motion globally — motion here should only ever
+   confirm an action, never run ambiently. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

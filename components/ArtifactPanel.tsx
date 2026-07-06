@@ -121,11 +121,11 @@ export default function ArtifactPanel({
 
   return (
     <div
-      className="h-full flex flex-col bg-[#fdfdfd] border-l border-[#ececec] shadow-2xl transition-all duration-300 relative"
+      className="h-full flex flex-col bg-surface border-l border-border shadow-2xl transition-all duration-300 relative"
       id="artifact-panel-container"
     >
       {/* Premium top header bar matching the Sleek design theme */}
-      <header className="h-14 flex items-center px-4 justify-between border-b border-[#ececec] bg-white select-none relative z-10">
+      <header className="h-14 flex items-center px-4 justify-between border-b border-border bg-surface-raised select-none relative z-10">
         <div className="flex items-center space-x-2.5 overflow-hidden">
           <div className={`p-1.5 rounded flex-shrink-0 ${
             artifact.type === "word" ? "bg-blue-50 text-blue-600" :
@@ -133,7 +133,7 @@ export default function ArtifactPanel({
             artifact.type === "ppt" ? "bg-orange-50 text-orange-600" :
             artifact.type === "svg" ? "bg-purple-50 text-purple-600" :
             artifact.type === "mermaid" ? "bg-indigo-50 text-indigo-600" :
-            "bg-emerald-50 text-emerald-600"
+            "bg-success-surface text-success"
           }`}>
             <span className="material-symbols-outlined text-sm font-bold block leading-none">
               {artifact.type === "word" ? "description" :
@@ -145,16 +145,16 @@ export default function ArtifactPanel({
             </span>
           </div>
           <div className="flex flex-col overflow-hidden">
-            <span className="text-sm font-semibold text-[#1a1a1a] truncate">
+            <span className="text-sm font-semibold text-on-surface truncate">
               {artifact.title}
             </span>
             {isViewingHistory && (
-              <span className="text-[10px] text-amber-600 font-bold tracking-tight">
+              <span className="text-[10px] text-warning font-bold tracking-tight">
                 Viewing Version History: V{selectedVersion.version} (Preview)
               </span>
             )}
             {restoredVersionNumber && (
-              <span className="text-[10px] text-emerald-600 font-bold tracking-tight animate-pulse">
+              <span className="text-[10px] text-success font-bold tracking-tight animate-pulse">
                 Successfully restored Version V{restoredVersionNumber}!
               </span>
             )}
@@ -162,31 +162,31 @@ export default function ArtifactPanel({
         </div>
         
         <div className="flex items-center space-x-2 flex-shrink-0">
-          <span className="text-[10px] bg-[#f3f4f6] text-[#8e8e8e] px-2 py-0.5 rounded font-mono uppercase tracking-wider">
+          <span className="text-[10px] bg-surface-sunken text-on-surface-muted px-2 py-0.5 rounded font-mono uppercase tracking-wider">
             {artifact.type}
           </span>
 
           {/* Visual Diff Toggle Button */}
           <button
             onClick={() => setShowDiff(!showDiff)}
-            className={`flex items-center space-x-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${
+            className={`flex items-center space-x-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
               showDiff
-                ? "bg-emerald-50 text-emerald-700 border-emerald-200 shadow-sm"
-                : "bg-white text-slate-700 border-[#e0e0e0] hover:bg-[#f9f9f8]"
+                ? "bg-success-surface text-success border-success/30 shadow-sm"
+                : "bg-surface-raised text-on-surface border-border hover:bg-surface-sunken"
             }`}
             title="Compare with original AI-generated version"
           >
-            <GitCompare size={13} className={showDiff ? "text-emerald-600" : "text-slate-500"} />
+            <GitCompare size={13} className={showDiff ? "text-success" : "text-on-surface-muted"} />
             <span className="hidden sm:inline">Visual Diff</span>
           </button>
 
           {/* Version History Toggle Button */}
           <button
             onClick={() => setShowVersionHistory(!showVersionHistory)}
-            className={`flex items-center space-x-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${
+            className={`flex items-center space-x-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
               showVersionHistory
-                ? "bg-amber-50 text-amber-700 border-amber-200"
-                : "bg-white text-slate-700 border-[#e0e0e0] hover:bg-[#f9f9f8]"
+                ? "bg-warning-surface text-warning border-warning/30"
+                : "bg-surface-raised text-on-surface border-border hover:bg-surface-sunken"
             }`}
             title="View History Versions"
           >
@@ -196,7 +196,7 @@ export default function ArtifactPanel({
 
           <button
             onClick={onClose}
-            className="text-[#8e8e8e] hover:text-[#1a1a1a] transition-colors p-1.5 hover:bg-[#f3f4f6] rounded-lg cursor-pointer"
+            className="text-on-surface-muted hover:text-on-surface transition-colors p-1.5 hover:bg-surface-sunken rounded-lg cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
             title="Close Panel"
           >
             <X size={15} />
@@ -207,23 +207,23 @@ export default function ArtifactPanel({
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* Render active document editor */}
-        <div className="flex-1 overflow-hidden p-3 relative bg-[#f1f1f1] flex flex-col h-full">
+        <div className="flex-1 overflow-hidden p-3 relative bg-surface-sunken flex flex-col h-full">
           {/* History Mode Info Panel */}
           {isViewingHistory && (
-            <div className="mb-2 bg-amber-50 border border-amber-200 p-2.5 rounded-xl flex items-center justify-between text-xs text-amber-800 shadow-sm">
+            <div className="mb-2 bg-warning-surface border border-warning/30 p-2.5 rounded-xl flex items-center justify-between text-xs text-warning shadow-sm">
               <span className="font-medium">
                 You are previewing a static history state: <strong>Version {selectedVersion.version}</strong>
               </span>
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => handleRestoreVersion(selectedVersion)}
-                  className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-2.5 py-1 rounded-lg text-[11px] cursor-pointer transition-colors"
+                  className="bg-warning hover:opacity-90 text-on-primary font-bold px-2.5 py-1 rounded-lg text-[11px] cursor-pointer transition-colors"
                 >
                   Restore this version
                 </button>
                 <button
                   onClick={() => setSelectedVersion(null)}
-                  className="bg-white border border-amber-200 px-2.5 py-1 rounded-lg text-[11px] text-slate-700 font-semibold cursor-pointer hover:bg-amber-100/50 transition-colors"
+                  className="bg-surface-raised border border-warning/30 px-2.5 py-1 rounded-lg text-[11px] text-on-surface font-semibold cursor-pointer hover:bg-warning-surface transition-colors"
                 >
                   Back to live
                 </button>
@@ -296,15 +296,15 @@ export default function ArtifactPanel({
 
         {/* Sliding Version History Sidebar Drawer */}
         {showVersionHistory && (
-          <div className="w-64 bg-white border-l border-[#ececec] h-full flex flex-col shadow-xl z-20 animate-in slide-in-from-right duration-200">
-            <div className="p-4 border-b border-[#ececec] flex items-center justify-between bg-slate-50">
-              <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center space-x-1">
-                <History size={12} className="text-amber-600" />
+          <div className="w-64 bg-surface-raised border-l border-border h-full flex flex-col shadow-xl z-20 animate-in slide-in-from-right duration-200">
+            <div className="p-4 border-b border-border flex items-center justify-between bg-surface-sunken">
+              <span className="text-xs font-bold text-on-surface uppercase tracking-wider flex items-center space-x-1">
+                <History size={12} className="text-warning" />
                 <span>Version Snapshots</span>
               </span>
               <button
                 onClick={() => setShowVersionHistory(false)}
-                className="text-[#8e8e8e] hover:text-[#1a1a1a] p-1 hover:bg-[#ececec] rounded"
+                className="text-on-surface-muted hover:text-on-surface p-1 hover:bg-surface-sunken rounded"
               >
                 <X size={14} />
               </button>
@@ -317,12 +317,12 @@ export default function ArtifactPanel({
                   onClick={() => setSelectedVersion(null)}
                   className={`p-3 border rounded-xl text-left cursor-pointer transition-all ${
                     selectedVersion === null
-                      ? "border-blue-500 bg-blue-50/20 text-[#1a1a1a] font-semibold"
-                      : "border-[#ececec] hover:border-[#c0c0c0] text-slate-600"
+                      ? "border-primary bg-primary/10 text-on-surface font-semibold"
+                      : "border-border hover:border-on-surface-muted/40 text-on-surface-muted"
                   }`}
                 >
                   <div className="text-xs font-bold">V1 (Initial Active)</div>
-                  <div className="text-[10px] text-slate-500 mt-1">Current unmodified live state</div>
+                  <div className="text-[10px] text-on-surface-muted mt-1">Current unmodified live state</div>
                 </div>
               ) : (
                 versions.map((ver, idx) => {
@@ -334,23 +334,23 @@ export default function ArtifactPanel({
                       onClick={() => setSelectedVersion(ver)}
                       className={`p-3 border rounded-xl text-left cursor-pointer transition-all relative group ${
                         isCurrentSelected
-                          ? "border-amber-500 bg-amber-50/10 text-amber-900 font-semibold shadow-sm"
+                          ? "border-warning bg-warning-surface/10 text-warning font-semibold shadow-sm"
                           : isLiveActive
-                          ? "border-blue-500 bg-blue-50/10 text-blue-900 font-semibold shadow-sm"
-                          : "border-[#ececec] hover:border-[#c0c0c0] text-slate-600"
+                          ? "border-primary bg-primary/10 text-primary font-semibold shadow-sm"
+                          : "border-border hover:border-on-surface-muted/40 text-on-surface-muted"
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-[#1a1a1a]">
+                        <span className="text-xs font-bold text-on-surface">
                           Version {ver.version} {idx === versions.length - 1 && " (Latest)"}
                         </span>
                         {isLiveActive && (
-                          <span className="text-[8px] bg-blue-100 text-blue-800 font-semibold px-1 rounded uppercase tracking-wider">
+                          <span className="text-[8px] bg-primary/15 text-primary font-semibold px-1 rounded uppercase tracking-wider">
                             Live
                           </span>
                         )}
                       </div>
-                      <p className="text-[10px] text-[#8e8e8e] mt-1.5">
+                      <p className="text-[10px] text-on-surface-muted mt-1.5">
                         {new Date(ver.createdAt).toLocaleTimeString([], {
                           hour: "2-digit",
                           minute: "2-digit",
@@ -366,7 +366,7 @@ export default function ArtifactPanel({
                             e.stopPropagation();
                             handleRestoreVersion(ver);
                           }}
-                          className="absolute right-2.5 bottom-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[9px] font-bold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute right-2.5 bottom-2 bg-surface-sunken hover:bg-surface-sunken/70 text-on-surface text-[9px] font-bold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           Restore
                         </button>

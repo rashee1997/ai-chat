@@ -87,28 +87,28 @@ export default function Sidebar({
   };
 
   return (
-    <aside className="w-64 border-r border-[#ececec] bg-[#f9f9f8] h-full flex flex-col select-none" id="app-sidebar">
+    <aside className="w-64 border-r border-border bg-surface-sunken h-full flex flex-col select-none" id="app-sidebar">
       {/* Top Section: App Title & Model Selection */}
-      <div className="p-4 border-b border-[#ececec] flex flex-col space-y-3" id="sidebar-header">
+      <div className="p-4 border-b border-border flex flex-col space-y-3" id="sidebar-header">
         <div className="flex items-center space-x-2.5">
-          <div className="flex items-center justify-center w-7 h-7 rounded bg-[#6d28d9] text-white shadow-sm">
+          <div className="flex items-center justify-center w-7 h-7 rounded bg-primary text-on-primary shadow-sm">
             <Sparkles size={14} />
           </div>
-          <span className="font-sans font-bold text-sm text-[#1a1a1a] tracking-tight">
+          <span className="font-sans font-bold text-sm text-on-surface tracking-tight">
             Artifact Studio
           </span>
         </div>
 
         {/* Dynamic Model Dropdown */}
         <div className="relative" id="model-dropdown-container">
-          <label className="text-[10px] text-[#8e8e8e] uppercase font-bold tracking-wider block mb-1">
+          <label className="text-[10px] text-on-surface-muted uppercase font-bold tracking-wider block mb-1">
             Active Intelligence
           </label>
           <div className="relative">
             <select
               value={selectedModel}
               onChange={(e) => onModelChange(e.target.value)}
-              className="w-full bg-white hover:bg-[#f3f4f6] border border-[#e0e0e0] rounded-xl px-3 py-1.5 pr-8 text-xs font-semibold text-[#1a1a1a] appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/10 cursor-pointer transition-all shadow-sm"
+              className="w-full bg-surface-raised hover:bg-surface-sunken border border-border rounded-xl px-3 py-1.5 pr-8 text-xs font-semibold text-on-surface appearance-none focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer transition-all shadow-sm"
               id="model-selector-dropdown"
             >
               <option value="gemini-3.5-flash">Gemini 3.5 Flash (Super Fast)</option>
@@ -117,7 +117,7 @@ export default function Sidebar({
               <option value="deep-research-preview-04-2026">Deep Research Agent (Smart Web Engine)</option>
               <option value="deep-research-max-preview-04-2026">Deep Research Max Agent (Exhaustive Search)</option>
             </select>
-            <ChevronDown size={12} className="absolute right-2.5 top-2.5 text-[#8e8e8e] pointer-events-none" />
+            <ChevronDown size={12} className="absolute right-2.5 top-2.5 text-on-surface-muted pointer-events-none" />
           </div>
         </div>
       </div>
@@ -126,10 +126,10 @@ export default function Sidebar({
       <div className="p-3" id="sidebar-action-container">
         <button
           onClick={onCreate}
-          className="w-full flex items-center justify-center space-x-2 p-2.5 bg-white hover:bg-[#f3f4f6] border border-[#e0e0e0] hover:border-[#d0d0d0] text-xs font-bold text-[#1a1a1a] rounded-xl shadow-sm hover:shadow transition-all cursor-pointer"
+          className="w-full flex items-center justify-center space-x-2 p-2.5 bg-surface-raised hover:bg-surface-sunken border border-border hover:border-on-surface-muted/40 text-xs font-bold text-on-surface rounded-xl shadow-sm hover:shadow transition-all cursor-pointer"
           id="new-chat-btn"
         >
-          <Plus size={14} className="text-[#6d28d9]" />
+          <Plus size={14} className="text-primary" />
           <span>New Chat</span>
         </button>
       </div>
@@ -141,14 +141,14 @@ export default function Sidebar({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search chats..."
-          className="w-full pl-8 pr-3 py-1.5 bg-white border border-[#e0e0e0] focus:border-[#c0c0c0] rounded-xl text-xs focus:outline-none transition-all shadow-sm placeholder-[#999]"
+          className="w-full pl-8 pr-3 py-1.5 bg-surface-raised border border-border focus:border-on-surface-muted/40 rounded-xl text-xs focus:outline-none transition-all shadow-sm placeholder-on-surface-muted"
           id="conversation-search"
         />
-        <Search size={12} className="absolute left-5.5 top-2.5 text-[#8e8e8e]" />
+        <Search size={12} className="absolute left-5.5 top-2.5 text-on-surface-muted" />
         {search && (
           <button
             onClick={() => setSearch("")}
-            className="absolute right-5 top-2 text-[#8e8e8e] hover:text-[#1a1a1a]"
+            className="absolute right-5 top-2 text-on-surface-muted hover:text-on-surface"
           >
             <X size={12} />
           </button>
@@ -161,8 +161,8 @@ export default function Sidebar({
         {pinnedConversations.length > 0 && (
           <div className="space-y-1">
             <div className="flex items-center space-x-1 px-2 mb-1">
-              <Star size={10} className="text-amber-500 fill-amber-500" />
-              <span className="text-[10px] text-[#8e8e8e] uppercase font-bold tracking-wider">
+              <Star size={10} className="text-warning fill-warning" />
+              <span className="text-[10px] text-on-surface-muted uppercase font-bold tracking-wider">
                 Pinned
               </span>
             </div>
@@ -177,9 +177,9 @@ export default function Sidebar({
         {/* Regular Chats */}
         <div className="space-y-1">
           {pinnedConversations.length > 0 && regularConversations.length > 0 && (
-            <div className="flex items-center space-x-1 px-2 mb-1 pt-2 border-t border-[#ececec]/60">
-              <Clock size={10} className="text-[#8e8e8e]" />
-              <span className="text-[10px] text-[#8e8e8e] uppercase font-bold tracking-wider">
+            <div className="flex items-center space-x-1 px-2 mb-1 pt-2 border-t border-border/60">
+              <Clock size={10} className="text-on-surface-muted" />
+              <span className="text-[10px] text-on-surface-muted uppercase font-bold tracking-wider">
                 Recent Chats
               </span>
             </div>
@@ -192,7 +192,7 @@ export default function Sidebar({
             ))
           ) : (
             filteredConversations.length === 0 && (
-              <div className="p-4 text-center text-[11px] text-[#8e8e8e] italic select-none">
+              <div className="p-4 text-center text-[11px] text-on-surface-muted italic select-none">
                 No chats found
               </div>
             )
@@ -211,23 +211,23 @@ export default function Sidebar({
       return (
         <form
           onSubmit={(e) => saveRename(conv.id, e)}
-          className="flex items-center space-x-1 p-1 bg-white border border-blue-500 rounded-lg mx-1"
+          className="flex items-center space-x-1 p-1 bg-surface-raised border border-primary rounded-lg mx-1"
           onClick={(e) => e.stopPropagation()}
         >
           <input
             type="text"
             value={editTitle}
             onChange={(e) => setEditTitle(e.target.value)}
-            className="flex-1 text-xs bg-transparent focus:outline-none px-1 py-0.5 text-[#1a1a1a]"
+            className="flex-1 text-xs bg-transparent focus:outline-none px-1 py-0.5 text-on-surface"
             autoFocus
           />
-          <button type="submit" className="text-emerald-600 hover:bg-[#ececec] p-1 rounded">
+          <button type="submit" className="text-emerald-600 hover:bg-surface-sunken p-1 rounded">
             <Check size={11} />
           </button>
           <button
             type="button"
             onClick={() => setEditingId(null)}
-            className="text-red-500 hover:bg-[#ececec] p-1 rounded"
+            className="text-danger hover:bg-surface-sunken p-1 rounded"
           >
             <X size={11} />
           </button>
@@ -238,20 +238,20 @@ export default function Sidebar({
     if (isConfirmingDelete) {
       return (
         <div
-          className="flex items-center justify-between p-1.5 bg-red-50 border border-red-200 text-[10px] font-semibold text-red-700 rounded-lg mx-1"
+          className="flex items-center justify-between p-1.5 bg-danger-surface border border-danger/30 text-[10px] font-semibold text-danger rounded-lg mx-1"
           onClick={(e) => e.stopPropagation()}
         >
           <span>Delete thread?</span>
           <div className="flex items-center space-x-1">
             <button
               onClick={(e) => confirmDelete(conv.id, e)}
-              className="bg-red-600 text-white px-2 py-0.5 rounded hover:bg-red-700 font-bold"
+              className="bg-danger text-on-primary px-2 py-0.5 rounded hover:bg-danger/90 font-bold"
             >
               Yes
             </button>
             <button
               onClick={cancelDelete}
-              className="bg-white border border-red-200 px-2 py-0.5 rounded hover:bg-[#ececec] text-[#333] font-bold"
+              className="bg-surface-raised border border-danger/30 px-2 py-0.5 rounded hover:bg-surface-sunken text-on-surface font-bold"
             >
               No
             </button>
@@ -265,35 +265,35 @@ export default function Sidebar({
         onClick={() => onSelect(conv.id)}
         className={`flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-medium cursor-pointer transition-all mx-1 relative group ${
           isActive
-            ? "bg-white text-[#1a1a1a] shadow-sm border border-[#ececec] font-semibold"
-            : "text-[#555] hover:bg-[#ececec]/60 hover:text-[#1a1a1a] border border-transparent"
+            ? "bg-surface-raised text-on-surface shadow-sm border border-border font-semibold"
+            : "text-on-surface-muted hover:bg-surface-sunken/60 hover:text-on-surface border border-transparent"
         }`}
         title={conv.title}
       >
         <div className="flex items-center space-x-2 overflow-hidden w-full pr-12">
-          <MessageSquare size={13} className={`flex-shrink-0 ${isActive ? "text-[#6d28d9]" : "text-[#8e8e8e]"}`} />
+          <MessageSquare size={13} className={`flex-shrink-0 ${isActive ? "text-primary" : "text-on-surface-muted"}`} />
           <span className="truncate pr-2">{conv.title}</span>
         </div>
 
         {/* Action icons, only visible on item hover */}
-        <div className="absolute right-1.5 top-1.5 flex items-center space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-l from-[#f9f9f8] group-hover:from-white/10 pl-4 py-0.5">
+        <div className="absolute right-1.5 top-1.5 flex items-center space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-l from-surface-sunken group-hover:from-surface-raised/10 pl-4 py-0.5">
           <button
             onClick={(e) => togglePin(conv, e)}
-            className="p-1 rounded text-[#8e8e8e] hover:text-amber-500 hover:bg-[#ececec] transition-colors"
+            className="p-1 rounded text-on-surface-muted hover:text-warning hover:bg-surface-sunken transition-colors"
             title={conv.pinned ? "Unpin thread" : "Pin thread"}
           >
-            <Pin size={11} className={conv.pinned ? "fill-amber-500 text-amber-500" : ""} />
+            <Pin size={11} className={conv.pinned ? "fill-warning text-warning" : ""} />
           </button>
           <button
             onClick={(e) => startRename(conv, e)}
-            className="p-1 rounded text-[#8e8e8e] hover:text-[#1a1a1a] hover:bg-[#ececec] transition-colors"
+            className="p-1 rounded text-on-surface-muted hover:text-on-surface hover:bg-surface-sunken transition-colors"
             title="Rename thread"
           >
             <Edit2 size={11} />
           </button>
           <button
             onClick={(e) => handleDeleteClick(conv.id, e)}
-            className="p-1 rounded text-[#8e8e8e] hover:text-red-500 hover:bg-[#ececec] transition-colors"
+            className="p-1 rounded text-on-surface-muted hover:text-danger hover:bg-surface-sunken transition-colors"
             title="Delete thread"
           >
             <Trash2 size={11} />
