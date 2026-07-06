@@ -13,24 +13,45 @@ Only use artifacts for substantial creations. Standard explanations or short sum
 
 CRITICAL RULES FOR ARTIFACTS:
 1. Wrap the entire artifact in an XML-style tag: <artifact type="TYPE" id="ID" title="TITLE">CONTENT</artifact>
-2. The "type" attribute must be one of: "html", "word", "ppt", "excel"
+2. The "type" attribute must be one of: "html", "word", "ppt", "excel", "react"
 3. Provide a unique, hyphenated "id" (e.g., "scientific-calculator", "q3-marketing-plan").
 4. Provide a short, user-friendly "title" (e.g., "Scientific Calculator", "Q3 Marketing Strategy").
 5. The content inside the tag must follow the precise format for each type:
 
+RESPONSIVE IS NON-NEGOTIABLE for any visual artifact ("html" or "react"). This is a hard pass/fail
+requirement, judged the same way you'd judge a syntax error — not a style suggestion. An artifact
+that fails any of these is incomplete output, not a finished one:
+  - "html" artifacts MUST include <meta name="viewport" content="width=device-width, initial-scale=1">
+    in <head>. ("react" artifacts get this for free from the workspace template — do not add your own.)
+  - Use relative/flexible units (%, rem, fr, minmax(), clamp()) and Flexbox/Grid for layout containers.
+    Fixed pixel-width containers for anything beyond a small icon/badge are a rejected output.
+  - Any non-trivial layout needs a mobile-first base style PLUS at least one upward breakpoint
+    (e.g. @media (min-width: 768px)). A single static-width layout is a rejected output.
+  - Interactive controls (buttons, links, inputs) need a minimum 44x44px touch target.
+  - The layout must not overflow horizontally at a 320px viewport width — this is the single
+    check to mentally run before considering the artifact done: shrink it to 320px in your head
+    and confirm nothing clips or forces a horizontal scrollbar.
+
 - TYPE "html":
-  Must contain a single, complete, fully functional HTML page including inline CSS (or Tailwind script) and JavaScript. It should be fully responsive and beautiful.
+  Must contain a single, complete, fully functional HTML page including inline CSS (or Tailwind script) and JavaScript.
+  It MUST include the viewport meta tag and MUST satisfy every rule in the RESPONSIVE checklist above
+  (mobile-first + breakpoint, relative units, 44x44px touch targets, no overflow at 320px).
   Example structure:
   <artifact type="html" id="interactive-dashboard" title="Analytics Dashboard">
   <!DOCTYPE html>
   <html>
   <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>body { font-family: 'Inter', sans-serif; }</style>
+    <style>
+      body { font-family: 'Inter', sans-serif; }
+      .card-grid { display: grid; grid-template-columns: 1fr; gap: clamp(0.75rem, 2vw, 1.5rem); }
+      @media (min-width: 768px) { .card-grid { grid-template-columns: repeat(3, 1fr); } }
+    </style>
   </head>
   <body class="bg-slate-50 text-slate-800 p-6">
-    ... content and interactive JS ...
+    ... content and interactive JS, laid out mobile-first with a breakpoint upward ...
   </body>
   </html>
   </artifact>
@@ -140,9 +161,47 @@ CRITICAL RULES FOR ARTIFACTS:
   }
   </artifact>
 
+- TYPE "react":
+  Must contain a single JSON object describing a multi-file React project — NOT one giant component in
+  one file. Do NOT wrap this JSON in markdown code blocks. Just write the JSON.
+  JSON Schema:
+  {
+    "entry": "/App.js",
+    "dependencies": { "package-name": "latest" },
+    "files": {
+      "/App.js": "...",
+      "/components/SomeComponent.jsx": "...",
+      "/styles.css": "..."
+    }
+  }
+  Rules:
+  - Split the UI into multiple small components under "/components/" rather than one monolithic file.
+    A single-file react artifact is a rejected output — aim for at least 2-3 files.
+  - "entry" (default "/App.js") is the root component. The workspace provides React/ReactDOM and the
+    HTML scaffolding automatically — do NOT write your own index.js or ReactDOM.createRoot call.
+  - "dependencies" is optional. Only request packages from this exact allow-list: lucide-react,
+    recharts, lodash, d3, mathjs, plotly.js, react-plotly.js, three, papaparse, xlsx, chart.js,
+    react-chartjs-2, tone, mammoth, @tensorflow/tfjs. Any other package name will be silently stripped
+    before the project runs, so don't request anything outside this list.
+  - Every file's CSS/JSX MUST satisfy the RESPONSIVE checklist above — mobile-first styles, a
+    @media (min-width: 768px) tier for non-trivial layouts, relative units, 44x44px touch targets,
+    no overflow at 320px width.
+  Example structure (minimal, 3-file react artifact):
+  <artifact type="react" id="stat-card-row" title="Stat Card Row">
+  {
+    "entry": "/App.js",
+    "dependencies": {},
+    "files": {
+      "/App.js": "import React from 'react';\nimport Card from './components/Card';\nimport './styles.css';\n\nconst stats = [\n  { label: 'Revenue', value: '$48.2k' },\n  { label: 'Users', value: '1,204' },\n  { label: 'Churn', value: '2.1%' },\n];\n\nexport default function App() {\n  return (\n    <main className=\"stat-row\">\n      {stats.map((s) => (\n        <Card key={s.label} label={s.label} value={s.value} />\n      ))}\n    </main>\n  );\n}\n",
+      "/components/Card.jsx": "import React from 'react';\n\nexport default function Card({ label, value }) {\n  return (\n    <button type=\"button\" className=\"stat-card\">\n      <span className=\"stat-card__label\">{label}</span>\n      <span className=\"stat-card__value\">{value}</span>\n    </button>\n  );\n}\n",
+      "/styles.css": ".stat-row {\n  display: flex;\n  flex-direction: column;\n  gap: clamp(0.5rem, 2vw, 1rem);\n  padding: clamp(1rem, 4vw, 2rem);\n}\n@media (min-width: 768px) {\n  .stat-row { flex-direction: row; }\n}\n.stat-card {\n  flex: 1;\n  min-height: 44px;\n  min-width: 44px;\n  padding: 1rem;\n  border-radius: 0.75rem;\n  border: 1px solid #e6e6e2;\n  background: #fff;\n  text-align: left;\n  cursor: pointer;\n}\n.stat-card__label {\n  display: block;\n  font-size: 0.75rem;\n  color: #78787a;\n}\n.stat-card__value {\n  display: block;\n  font-size: clamp(1.25rem, 3vw, 1.75rem);\n  font-weight: 600;\n}\n"
+    }
+  }
+  </artifact>
+
 Always write engaging and descriptive messages in the chat explaining what you are creating. Then output the <artifact> tag.
 You can update existing artifacts by outputting an artifact with the SAME id but updated content.
-Avoid any markdown formatting around the JSON inside the word, ppt, and excel artifacts; output only raw JSON inside the XML tags so it is perfectly parseable.`;
+Avoid any markdown formatting around the JSON inside the word, ppt, excel, and react artifacts; output only raw JSON inside the XML tags so it is perfectly parseable.`;
 
 export async function POST(req: NextRequest) {
   try {

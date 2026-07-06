@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { parseReactArtifactContent } from "@/lib/reactArtifact";
 
 export async function GET(req: NextRequest) {
   try {
@@ -21,10 +22,23 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { artifactId, content, type, title } = body;
+    const { artifactId, type, title } = body;
+    let { content } = body;
 
     if (!artifactId || content === undefined || !type || !title) {
       return NextResponse.json({ error: "Missing required fields for version saving" }, { status: 400 });
+    }
+
+    if (type === "react") {
+      const parsed = parseReactArtifactContent(content);
+      if (!parsed.ok) {
+        return NextResponse.json(
+          { error: `Invalid react artifact content: ${parsed.error}` },
+          { status: 400 }
+        );
+      }
+      // Persist the sanitized (dependency-stripped) shape, not the raw model output.
+      content = JSON.stringify(parsed.content);
     }
 
     const savedVersion = db.saveArtifactVersion(artifactId, { content, type, title });
