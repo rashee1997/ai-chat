@@ -42,14 +42,14 @@ function toConversation(row: {
 function toMessage(row: {
   id: string;
   conversationId: string;
-  role: string;
+  role: DBMessage["role"];
   content: string;
   timestamp: Date;
 }): DBMessage {
   return {
     id: row.id,
     conversationId: row.conversationId,
-    role: row.role as "user" | "assistant",
+    role: row.role,
     content: row.content,
     timestamp: row.timestamp.toISOString(),
   };
@@ -82,7 +82,7 @@ function toJob(row: {
   userId: string;
   agentType: string;
   geminiInteractionId: string;
-  status: string;
+  status: DBRemoteAgentJob["status"];
   inputSummary: string;
   resultJson: string | null;
   errorMessage: string | null;
@@ -96,7 +96,7 @@ function toJob(row: {
     userId: row.userId,
     agentType: row.agentType,
     geminiInteractionId: row.geminiInteractionId,
-    status: row.status as DBRemoteAgentJob["status"],
+    status: row.status,
     inputSummary: row.inputSummary,
     resultJson: row.resultJson ?? undefined,
     errorMessage: row.errorMessage ?? undefined,

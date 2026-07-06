@@ -24,11 +24,16 @@ model Conversation {
   messages  Message[]
 }
 
+enum MessageRole {
+  user
+  assistant
+}
+
 model Message {
   id             String       @id
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  role           String
+  role           MessageRole
   content        String
   timestamp      DateTime     @default(now())
 
@@ -51,19 +56,28 @@ model ArtifactVersion {
   @@index([artifactId])
 }
 
+enum JobStatus {
+  queued
+  in_progress
+  requires_action
+  completed
+  failed
+  cancelled
+}
+
 model RemoteAgentJob {
-  id                  String   @id
+  id                  String    @id
   conversationId      String
   messageId           String?
   userId              String
   agentType           String
-  geminiInteractionId String   @unique
-  status              String
+  geminiInteractionId String    @unique
+  status              JobStatus
   inputSummary        String
   resultJson          String?
   errorMessage        String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   @@index([conversationId])
 }

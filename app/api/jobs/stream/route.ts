@@ -56,9 +56,15 @@ export async function GET(req: NextRequest) {
           let job = jobId ? await db.getJob(jobId) : undefined;
           if (!job && conversationId) {
             const jobs = await db.getJobsForConversation(conversationId);
-            job =
-              jobs.find((j) => !TERMINAL_STATUSES.includes(j.status)) ||
-              jobs[jobs.length - 1];
+            // db.getJobsForConversation doesn't guarantee ordering, so with
+            // multiple jobs on one conversation "first non-terminal" could
+            // pick an arbitrary (e.g. stale/superseded) job rather than the
+            // most recent one. Sort by recency first, then prefer the
+            // newest non-terminal job, falling back to the newest overall.
+            const byRecencyDesc = [...jobs].sort(
+              (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+            );
+            job = byRecencyDesc.find((j) => !TERMINAL_STATUSES.includes(j.status)) || byRecencyDesc[0];
           }
 
           if (job) {

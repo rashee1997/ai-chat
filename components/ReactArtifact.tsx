@@ -26,7 +26,6 @@ import {
 import { appSandpackTheme } from "@/lib/sandpackTheme";
 import {
   parseReactArtifactContent,
-  sanitizeReactDependencies,
   type ReactArtifactContent,
 } from "@/lib/reactArtifact";
 
@@ -60,8 +59,16 @@ export default function ReactArtifact({ content, title, id, onContentChange }: R
   const [prevContent, setPrevContent] = useState<string | null>(null);
   const [pendingSelfSave, setPendingSelfSave] = useState<string | null>(null);
 
-  // Render-phase sync (same convention as the other Artifact components):
-  // only accept a new files/dependency snapshot — and remount the Sandpack
+  // Deliberately NOT a useEffect: this is React's own documented pattern for
+  // "adjusting state when a prop changes" (see
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes) —
+  // comparing to a "previous prop" state during render and conditionally
+  // updating. An effect would introduce an extra commit-then-rerender pass
+  // (briefly rendering with stale `parsed`) and this project's lint config
+  // (react-hooks/set-state-in-effect) rejects synchronous setState-in-effect
+  // outright, so this intentionally stays in the render body.
+  //
+  // Only accept a new files/dependency snapshot — and remount the Sandpack
   // instance — when the incoming content actually changed and parses
   // cleanly. Partial JSON mid-stream fails to parse and is ignored until
   // the model finishes; a round-trip of our own "Save as new version" is
@@ -104,7 +111,9 @@ export default function ReactArtifact({ content, title, id, onContentChange }: R
     );
   }
 
-  const dependencies = sanitizeReactDependencies(parsed.dependencies);
+  // parseReactArtifactContent() already sanitized dependencies against the
+  // allow-list — parsed.dependencies is the final, safe-to-use shape.
+  const dependencies = parsed.dependencies ?? {};
   const fileKeys = Object.keys(parsed.files);
   const entry = parsed.entry && parsed.files[parsed.entry] ? parsed.entry : fileKeys[0];
 

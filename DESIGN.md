@@ -180,6 +180,24 @@ If a future React major version (or bundler incompatibility) ever appears
 with no upstream fix, the recorded fallback to evaluate is **StackBlitz
 WebContainers** — a heavier but actively maintained alternative.
 
+**License note (transitive dependency, recorded deliberately):**
+`@codesandbox/sandpack-client` (a dependency of `sandpack-react`) pulls in
+`@codesandbox/nodebox`, which is licensed under CodeSandbox's own
+"Sustainable Use License" — a source-available, non-OSI-approved license
+that restricts use to internal/non-commercial purposes and free
+redistribution only. `nodebox` is `sandpack-client`'s in-browser Node.js
+runtime, used only by its `"node"` environment/template — this app only
+ever instantiates `template="react"` (see `components/ReactArtifact.tsx`),
+and `sandpack-client` loads the node client via a runtime-gated dynamic
+`require()`, so that code path is never reached and is very likely never
+even fetched as a chunk. It's still a transitive dependency present in
+`package-lock.json` (a supply-chain fact regardless of runtime reachability)
+and can't be removed without patching `sandpack-client` itself, which is
+pinned to an exact version specifically so this doesn't shift silently on
+an unrelated `npm install`. Flagged here so it's a recorded, deliberate
+tradeoff rather than a silent gap — revisit if `sandpack-client` ever makes
+`nodebox` a hard (non-lazy) dependency.
+
 The live preview iframe runs on CodeSandbox's own sandboxed subdomain by
 design (isolates model/user-written code from this app's cookies/
 localStorage) — this is a different, complementary boundary from the
