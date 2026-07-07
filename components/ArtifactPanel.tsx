@@ -65,9 +65,12 @@ export default function ArtifactPanel({
     touchStartY.current = null;
   };
 
-  // Fetch all saved versions of this artifact whenever it loads or changes
+  // Fetch all saved versions of this artifact once it's done streaming.
+  // Keyed on id + isComplete (not the whole object) so intermediate chunk
+  // updates during streaming don't re-fire this — otherwise every partial,
+  // not-yet-valid-JSON chunk gets POSTed as a "first version" save attempt.
   useEffect(() => {
-    if (!artifact) return;
+    if (!artifact || !artifact.isComplete) return;
 
     const fetchVersions = async () => {
       try {
@@ -113,7 +116,8 @@ export default function ArtifactPanel({
       setRestoredVersionNumber(null);
       setShowDiff(false);
     }, 0);
-  }, [artifact]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally excludes artifact.content: re-fetching on every keystroke-driven content change would refetch/re-save on our own writes
+  }, [artifact?.id, artifact?.isComplete]);
 
   if (!artifact) return null;
 
