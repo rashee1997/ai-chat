@@ -15,6 +15,12 @@ import {
 } from "@/lib/backgroundJobMessages";
 import type { DBConversation } from "@/lib/dbTypes";
 import { isBelowLgBreakpoint } from "@/lib/breakpoints";
+import { useResizableWidth } from "@/lib/useResizableWidth";
+
+const ARTIFACT_PANEL_MIN_WIDTH = 360;
+const ARTIFACT_PANEL_MAX_WIDTH = 1000;
+const ARTIFACT_PANEL_DEFAULT_WIDTH = 640;
+const ARTIFACT_PANEL_WIDTH_STORAGE_KEY = "artifact-panel-width";
 
 export default function Home() {
   const [conversations, setConversations] = useState<DBConversation[]>([]);
@@ -29,6 +35,13 @@ export default function Home() {
   const [isArtifactPanelOpen, setIsArtifactPanelOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [requiresActionJobId, setRequiresActionJobId] = useState<string | null>(null);
+  const { width: artifactPanelWidth, handleResizeStart: handleArtifactResizeStart } = useResizableWidth({
+    min: ARTIFACT_PANEL_MIN_WIDTH,
+    max: ARTIFACT_PANEL_MAX_WIDTH,
+    default: ARTIFACT_PANEL_DEFAULT_WIDTH,
+    storageKey: ARTIFACT_PANEL_WIDTH_STORAGE_KEY,
+    edge: "left",
+  });
 
   // Track Background Managed Agent Jobs in real-time (SSE + Polling Fallback)
   const trackBackgroundJob = (jobId: string, assistantMessageId: string) => {
@@ -696,10 +709,10 @@ export default function Home() {
           {/* Left Column: Chat panel. `@container` lets children (ChatPanel) use
               @container queries keyed to this column's own width, since it
               resizes independently of the viewport whenever the artifact
-              panel opens/closes. */}
+              panel opens/closes or gets dragged wider/narrower. */}
           <div
-            className={`h-full transition-all duration-300 @container/chat ${
-              isArtifactPanelOpen ? "w-full lg:w-[42%]" : "w-full"
+            className={`h-full min-w-0 transition-all duration-300 @container/chat ${
+              isArtifactPanelOpen ? "w-full lg:flex-1" : "w-full"
             }`}
             id="chat-column-wrapper"
           >
@@ -714,12 +727,23 @@ export default function Home() {
             />
           </div>
 
-          {/* Right Column: Artifact panel (Slid-in screen) */}
+          {/* Right Column: Artifact panel (Slid-in screen). Width is fixed
+              (not flex) on desktop so it can be drag-resized; a CSS var
+              carries the resized width through the `lg:` variant only, so
+              the base `w-full` still governs the mobile overlay. */}
           {isArtifactPanelOpen && activeArtifact && (
             <div
-              className="absolute lg:static top-0 right-0 w-full lg:w-[58%] h-full z-20 lg:z-auto shadow-2xl lg:shadow-none animate-in fade-in slide-in-from-right duration-200 @container/artifact"
+              style={{ ["--artifact-panel-width" as string]: `${artifactPanelWidth}px` }}
+              className="absolute lg:static lg:flex-shrink-0 top-0 right-0 w-full lg:w-[var(--artifact-panel-width)] h-full z-20 lg:z-auto shadow-2xl lg:shadow-none animate-in fade-in slide-in-from-right duration-200 @container/artifact"
               id="artifact-column-wrapper"
             >
+              {/* Desktop-only drag handle to resize the artifact panel;
+                  width is remembered per session via localStorage. */}
+              <div
+                onPointerDown={handleArtifactResizeStart}
+                className="hidden lg:block absolute top-0 left-0 h-full w-1.5 -ml-0.5 cursor-col-resize hover:bg-primary/40 active:bg-primary/60 z-30 touch-none"
+                title="Drag to resize artifact panel"
+              />
               <ArtifactPanel
                 artifact={activeArtifact}
                 onClose={() => setIsArtifactPanelOpen(false)}
