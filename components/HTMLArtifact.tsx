@@ -91,10 +91,6 @@ export default function HTMLArtifact({
   return (
     <div className="flex flex-col h-full bg-surface-sunken rounded-xl shadow-md border border-border overflow-hidden" id="html-artifact-wrapper">
       <ArtifactToolbar
-        icon={<div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />}
-        title={title}
-        badgeLabel="Web App"
-        badgeClassName="bg-emerald-50 border-emerald-200/50 text-emerald-600"
         mode={mode}
         onModeChange={setMode}
         onReload={handleReload}
