@@ -58,16 +58,24 @@ deploy, and again after any future schema change (e.g. by setting Vercel's
 Build Command to `prisma migrate deploy && next build`, or running it
 manually from your machine against the production connection string).
 
+On Vercel, this is automated: the `vercel-build` script runs
+`prisma db push --accept-data-loss` before `next build`, so the production
+database schema is synced to `prisma/schema.prisma` on every deploy without
+a manual step. `--accept-data-loss` is required because `db push` runs
+non-interactively in CI and would otherwise block on a confirmation prompt
+for changes it can't apply losslessly (e.g. narrowing a column) — review
+schema changes locally with `db:migrate` before pushing if that matters for
+your data.
+
 ## Deploying to Vercel
 
 1. Push this repo to GitHub and import it in Vercel.
 2. Set the environment variables above (`GEMINI_API_KEY`, `DATABASE_URL`) in
    Project Settings → Environment Variables.
-3. Deploy. `npm run build` already runs `prisma generate` via the
-   `postinstall` script, so the Prisma client is regenerated on every deploy
-   automatically.
-4. Run `npx prisma migrate deploy` against the production `DATABASE_URL`
-   (see above) before the first request hits the app.
+3. Deploy. Vercel runs the `vercel-build` script automatically, which runs
+   `prisma generate` (via the `postinstall` script), then
+   `prisma db push --accept-data-loss` to sync the schema, then `next build` —
+   no manual migration step is needed before or after the first deploy.
 
 No other Vercel-specific configuration is required — API routes that talk to
 Postgres or make outbound requests already declare `export const runtime =
