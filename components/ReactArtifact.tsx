@@ -141,7 +141,6 @@ export default function ReactArtifact({ content, title, id, onContentChange }: R
       className="h-full !block"
     >
       <Workspace
-        title={title}
         artifactId={id}
         entry={entry}
         dependencies={dependencies}
@@ -153,7 +152,6 @@ export default function ReactArtifact({ content, title, id, onContentChange }: R
 }
 
 interface WorkspaceProps {
-  title: string;
   artifactId: string;
   entry: string;
   dependencies: Record<string, string>;
@@ -161,7 +159,7 @@ interface WorkspaceProps {
   onSave: (files: Record<string, string>, dependencies: Record<string, string>, entry?: string) => void;
 }
 
-function Workspace({ title, artifactId, entry, dependencies, initialFiles, onSave }: WorkspaceProps) {
+function Workspace({ artifactId, entry, dependencies, initialFiles, onSave }: WorkspaceProps) {
   const { sandpack } = useSandpack();
   const { activeFile, files, editorState, setActiveFile, addFile, deleteFile } = sandpack;
 
@@ -271,10 +269,6 @@ function Workspace({ title, artifactId, entry, dependencies, initialFiles, onSav
   return (
     <div className="flex flex-col h-full bg-surface-sunken rounded-xl shadow-md border border-border overflow-hidden @container/react-workspace">
       <ArtifactToolbar
-        icon={<div className="w-2 h-2 rounded-full bg-sky-500 flex-shrink-0" />}
-        title={title}
-        badgeLabel="React"
-        badgeClassName="bg-sky-50 border-sky-200/50 text-sky-600"
         mode={mode}
         onModeChange={setMode}
         leftExtra={

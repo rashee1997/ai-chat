@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Download, Copy, Image as ImageIcon } from "lucide-react";
+import { Download, Copy } from "lucide-react";
 import ArtifactToolbar from "./ArtifactToolbar";
 
 interface SVGArtifactProps {
@@ -38,10 +38,6 @@ export default function SVGArtifact({
   return (
     <div className="flex flex-col h-full bg-surface-sunken rounded-xl shadow-md border border-border overflow-hidden" id="svg-artifact-wrapper">
       <ArtifactToolbar
-        icon={<ImageIcon size={18} className="text-[#6d28d9]" />}
-        title={title}
-        badgeLabel="Vector Graphic"
-        badgeClassName="bg-purple-50 border-purple-200/50 text-purple-600"
         mode={mode}
         onModeChange={setMode}
         exportOptions={[

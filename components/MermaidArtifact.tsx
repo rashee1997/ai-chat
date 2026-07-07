@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Download, Copy, GitBranch, Loader2 } from "lucide-react";
+import { Download, Copy, Loader2 } from "lucide-react";
 import ArtifactToolbar from "./ArtifactToolbar";
 
 interface MermaidArtifactProps {
@@ -91,10 +91,6 @@ export default function MermaidArtifact({
   return (
     <div className="flex flex-col h-full bg-surface-sunken rounded-xl shadow-md border border-border overflow-hidden" id="mermaid-artifact-wrapper">
       <ArtifactToolbar
-        icon={<GitBranch size={18} className="text-indigo-600" />}
-        title={title}
-        badgeLabel="Mermaid Diagram"
-        badgeClassName="bg-indigo-50 border-indigo-200/50 text-indigo-600"
         mode={mode}
         onModeChange={setMode}
         codeLabel="Markup"

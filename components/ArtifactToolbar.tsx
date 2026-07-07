@@ -10,14 +10,6 @@ export interface ArtifactExportOption {
 }
 
 interface ArtifactToolbarProps {
-  /** Type icon — caller-provided and colored per artifact-type identity
-   * (DESIGN.md exempts these badges/icons from the token pass). */
-  icon: React.ReactNode;
-  title: string;
-  badgeLabel: string;
-  /** Type-identity color classes (e.g. "bg-emerald-50 border-emerald-200/50
-   * text-emerald-600") — kept as-is per artifact type, not tokenized. */
-  badgeClassName: string;
   mode: "preview" | "code";
   onModeChange: (mode: "preview" | "code") => void;
   previewLabel?: string;
@@ -38,17 +30,14 @@ interface ArtifactToolbarProps {
 }
 
 /**
- * Shared per-artifact toolbar: title/badge, a Preview|Code segmented toggle,
- * an optional Reload action, and a single Export dropdown consolidating
- * copy/download actions — modeled on Google AI Studio's Build-mode chrome.
- * Panel-level concerns (fullscreen, close, version history) stay in
- * ArtifactPanel's own header; this is the per-renderer toolbar underneath it.
+ * Shared per-artifact toolbar: a Preview|Code segmented toggle, an optional
+ * Reload action, and a single Export dropdown consolidating copy/download
+ * actions — modeled on Google AI Studio's Build-mode chrome. Title/type
+ * identity and panel-level concerns (fullscreen, close, version history)
+ * already live in ArtifactPanel's own header above this, so this toolbar
+ * intentionally doesn't repeat them.
  */
 export default function ArtifactToolbar({
-  icon,
-  title,
-  badgeLabel,
-  badgeClassName,
   mode,
   onModeChange,
   previewLabel = "Preview",
@@ -81,18 +70,8 @@ export default function ArtifactToolbar({
   }, [exportOpen]);
 
   return (
-    <div className="flex items-center justify-between px-4 py-3 bg-surface-raised border-b border-border gap-2" id="artifact-toolbar">
-      <div className="flex items-center space-x-2 min-w-0">
-        {icon}
-        <span className="font-sans font-semibold text-on-surface text-sm tracking-tight truncate max-w-xs sm:max-w-md">
-          {title}
-        </span>
-        <span className={`text-xs font-medium px-2 py-0.5 rounded-full border flex-shrink-0 ${badgeClassName}`}>
-          {badgeLabel}
-        </span>
-      </div>
-
-      <div className="flex items-center space-x-1 flex-shrink-0">
+    <div className="flex items-center justify-between px-4 py-2 bg-surface-raised border-b border-border gap-2" id="artifact-toolbar">
+      <div className="flex items-center space-x-1 min-w-0">
         {leftExtra}
 
         <div className="flex items-center bg-surface-sunken rounded-lg p-0.5" role="tablist">
@@ -131,7 +110,9 @@ export default function ArtifactToolbar({
             <RotateCcw size={16} />
           </button>
         )}
+      </div>
 
+      <div className="flex items-center space-x-1 flex-shrink-0">
         {exportOptions.length > 0 && (
           <div className="relative" ref={exportRef}>
             <button
