@@ -2,7 +2,18 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
-import { X, History, ChevronLeft, ChevronRight, Check, RefreshCw, GitCompare, Loader2 } from "lucide-react";
+import {
+  X,
+  History,
+  ChevronLeft,
+  ChevronRight,
+  Check,
+  RefreshCw,
+  GitCompare,
+  Loader2,
+  Maximize2,
+  Minimize2,
+} from "lucide-react";
 import { Artifact } from "@/lib/types";
 import HTMLArtifact from "./HTMLArtifact";
 import WordArtifact from "./WordArtifact";
@@ -41,7 +52,20 @@ export default function ArtifactPanel({
   const [restoredVersionNumber, setRestoredVersionNumber] = useState<number | null>(null);
   const [showDiff, setShowDiff] = useState(false);
   const [dragOffsetY, setDragOffsetY] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const touchStartY = useRef<number | null>(null);
+
+  // Desktop focus/fullscreen mode: Esc exits it. Only wired up while active
+  // so it doesn't interfere with the mobile sidebar's own Escape handler
+  // (app/page.tsx, which only acts when below the lg breakpoint).
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
 
   // Mobile-only swipe-down-to-close: track the vertical drag on the header/
   // grab handle and dismiss the panel past a threshold, snapping back otherwise.
@@ -162,7 +186,9 @@ export default function ArtifactPanel({
 
   return (
     <div
-      className="h-full flex flex-col bg-surface border-l border-border shadow-2xl relative"
+      className={`flex flex-col bg-surface border-l border-border shadow-2xl relative ${
+        isFullscreen ? "fixed inset-0 z-50" : "h-full"
+      }`}
       id="artifact-panel-container"
       style={{
         transform: dragOffsetY ? `translateY(${dragOffsetY}px)` : undefined,
@@ -249,6 +275,15 @@ export default function ArtifactPanel({
           >
             <History size={13} />
             <span className="hidden @lg/artifact:inline">Versions ({versions.length || 1})</span>
+          </button>
+
+          {/* Fullscreen/focus mode toggle — desktop only, mobile is already a full-viewport overlay */}
+          <button
+            onClick={() => setIsFullscreen((v) => !v)}
+            className="hidden lg:flex items-center justify-center min-w-[44px] min-h-[44px] text-on-surface-muted hover:text-on-surface transition-colors hover:bg-surface-sunken rounded-lg cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            title={isFullscreen ? "Exit fullscreen (Esc)" : "Enter fullscreen"}
+          >
+            {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
           </button>
 
           <button

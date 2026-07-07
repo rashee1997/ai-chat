@@ -28,6 +28,13 @@ import {
   parseReactArtifactContent,
   type ReactArtifactContent,
 } from "@/lib/reactArtifact";
+import { useResizableWidth } from "@/lib/useResizableWidth";
+import ArtifactToolbar from "./ArtifactToolbar";
+
+const FILE_TREE_MIN_WIDTH = 140;
+const FILE_TREE_MAX_WIDTH = 400;
+const FILE_TREE_DEFAULT_WIDTH = 160;
+const FILE_TREE_WIDTH_STORAGE_KEY = "react-workspace-file-tree-width";
 
 interface ReactArtifactProps {
   content: string;
@@ -169,12 +176,19 @@ function Workspace({ title, artifactId, entry, dependencies, initialFiles, onSav
   const [userFiles, setUserFiles] = useState<string[]>(initialFiles);
 
   const [device, setDevice] = useState<DevicePreset>("mobile");
-  const [viewTab, setViewTab] = useState<"preview" | "code">("preview");
+  const [mode, setMode] = useState<"preview" | "code">("preview");
   const [showFileTree, setShowFileTree] = useState(true);
   const [addingFile, setAddingFile] = useState(false);
   const [newFilePath, setNewFilePath] = useState("");
   const [justSaved, setJustSaved] = useState(false);
   const newFileInputRef = useRef<HTMLInputElement>(null);
+  const { width: fileTreeWidth, handleResizeStart: handleFileTreeResizeStart } = useResizableWidth({
+    min: FILE_TREE_MIN_WIDTH,
+    max: FILE_TREE_MAX_WIDTH,
+    default: FILE_TREE_DEFAULT_WIDTH,
+    storageKey: FILE_TREE_WIDTH_STORAGE_KEY,
+    edge: "right",
+  });
 
   const isDirty = editorState === "dirty";
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -235,7 +249,7 @@ function Workspace({ title, artifactId, entry, dependencies, initialFiles, onSav
       addFile(path, newFileBoilerplate(path));
       setUserFiles((prev) => (prev.includes(path) ? prev : [...prev, path]));
       setActiveFile(path);
-      setViewTab("code");
+      setMode("code");
     }
     setNewFilePath("");
     setAddingFile(false);
@@ -256,37 +270,33 @@ function Workspace({ title, artifactId, entry, dependencies, initialFiles, onSav
 
   return (
     <div className="flex flex-col h-full bg-surface-sunken rounded-xl shadow-md border border-border overflow-hidden @container/react-workspace">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between gap-2 px-3 py-2 bg-surface-raised border-b border-border flex-wrap">
-        <div className="flex items-center gap-1.5 min-w-0">
+      <ArtifactToolbar
+        icon={<div className="w-2 h-2 rounded-full bg-sky-500 flex-shrink-0" />}
+        title={title}
+        badgeLabel="React"
+        badgeClassName="bg-sky-50 border-sky-200/50 text-sky-600"
+        mode={mode}
+        onModeChange={setMode}
+        leftExtra={
           <button
             onClick={() => setShowFileTree((v) => !v)}
-            className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+            className={`flex items-center justify-center min-w-[44px] min-h-[44px] lg:min-w-[36px] lg:min-h-[36px] rounded-lg border transition-colors cursor-pointer ${
               showFileTree
                 ? "bg-primary/10 border-primary/30 text-primary"
                 : "border-border text-on-surface-muted hover:bg-surface-sunken"
             }`}
             title={showFileTree ? "Hide file tree" : "Show file tree"}
           >
-            <FolderTree size={13} />
+            <FolderTree size={15} />
           </button>
-          <span className="text-xs font-semibold text-on-surface truncate max-w-[10rem]">{title}</span>
-          <span className="text-[10px] bg-sky-50 border border-sky-200/50 text-sky-600 font-medium px-2 py-0.5 rounded-full flex-shrink-0">
-            React
-          </span>
-        </div>
-
-        <div className="flex items-center gap-1.5 flex-wrap justify-end">
-          {/* Device preview toggle */}
+        }
+        previewExtra={
           <div className="bg-surface-sunken p-0.5 rounded-lg flex items-center border border-border/50">
             {DEVICE_PRESETS.map((preset) => (
               <button
                 key={preset.id}
-                onClick={() => {
-                  setDevice(preset.id);
-                  setViewTab("preview");
-                }}
-                className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                onClick={() => setDevice(preset.id)}
+                className={`flex items-center gap-1 min-h-[38px] px-2 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
                   device === preset.id
                     ? "bg-surface-raised text-on-surface shadow-sm"
                     : "text-on-surface-muted hover:text-on-surface"
@@ -298,77 +308,54 @@ function Workspace({ title, artifactId, entry, dependencies, initialFiles, onSav
               </button>
             ))}
           </div>
-
-          <div className="w-px h-5 bg-border" />
-
-          {/* Mobile/narrow-only Code/Preview tabs */}
-          <div className="flex @lg/react-workspace:hidden bg-surface-sunken p-0.5 rounded-lg border border-border/50">
+        }
+        exportOptions={[
+          { label: "Download .zip", onClick: handleDownloadZip, icon: <Download size={14} /> },
+        ]}
+        rightExtra={
+          <>
             <button
-              onClick={() => setViewTab("preview")}
-              className={`px-2 py-1 rounded-md text-[11px] font-semibold cursor-pointer ${
-                viewTab === "preview" ? "bg-surface-raised text-on-surface shadow-sm" : "text-on-surface-muted"
+              onClick={commitSave}
+              disabled={!isDirty}
+              className={`flex items-center gap-1.5 text-xs font-semibold min-h-[44px] lg:min-h-[36px] px-2.5 rounded-lg border transition-all cursor-pointer disabled:cursor-default ${
+                justSaved
+                  ? "bg-success-surface text-success border-success/30"
+                  : isDirty
+                  ? "bg-primary text-on-primary border-primary hover:bg-primary-hover"
+                  : "bg-surface-raised text-on-surface-muted border-border"
               }`}
+              title="Save current edits as a new artifact version"
             >
-              Preview
+              {justSaved ? <Check size={12} /> : <Save size={12} />}
+              <span className="hidden sm:inline">
+                {justSaved ? "Saved" : isDirty ? "Save as new version" : "Saved"}
+              </span>
             </button>
-            <button
-              onClick={() => setViewTab("code")}
-              className={`px-2 py-1 rounded-md text-[11px] font-semibold cursor-pointer ${
-                viewTab === "code" ? "bg-surface-raised text-on-surface shadow-sm" : "text-on-surface-muted"
-              }`}
+
+            <UnstyledOpenInCodeSandboxButton
+              className="flex items-center justify-center min-w-[44px] min-h-[44px] lg:min-w-[36px] lg:min-h-[36px] rounded-lg text-on-surface-muted hover:text-on-surface hover:bg-surface-sunken border border-transparent hover:border-border transition-all cursor-pointer"
+              title="Open in CodeSandbox"
             >
-              Code
-            </button>
-          </div>
+              <ExternalLink size={15} />
+            </UnstyledOpenInCodeSandboxButton>
+          </>
+        }
+      />
 
-          <button
-            onClick={commitSave}
-            disabled={!isDirty}
-            className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer disabled:cursor-default ${
-              justSaved
-                ? "bg-success-surface text-success border-success/30"
-                : isDirty
-                ? "bg-primary text-on-primary border-primary hover:bg-primary-hover"
-                : "bg-surface-raised text-on-surface-muted border-border"
-            }`}
-            title="Save current edits as a new artifact version"
-          >
-            {justSaved ? <Check size={12} /> : <Save size={12} />}
-            <span className="hidden @lg/react-workspace:inline">
-              {justSaved ? "Saved" : isDirty ? "Save as new version" : "Saved"}
-            </span>
-          </button>
-
-          <button
-            onClick={handleDownloadZip}
-            className="p-1.5 rounded-lg text-on-surface-muted hover:text-on-surface hover:bg-surface-sunken border border-transparent hover:border-border transition-all cursor-pointer"
-            title="Download project as .zip"
-          >
-            <Download size={13} />
-          </button>
-
-          <UnstyledOpenInCodeSandboxButton
-            className="p-1.5 rounded-lg text-on-surface-muted hover:text-on-surface hover:bg-surface-sunken border border-transparent hover:border-border transition-all cursor-pointer"
-            title="Open in CodeSandbox"
-          >
-            <ExternalLink size={13} />
-          </UnstyledOpenInCodeSandboxButton>
-        </div>
-      </div>
-
-      {/* Body */}
+      {/* Body: single-focus Preview or Code view (not a permanent split —
+          matches Google AI Studio's Build-mode model), file tree only shown
+          alongside the code editor. */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* File tree */}
-        {showFileTree && (
-          <div className="w-40 flex-shrink-0 border-r border-border bg-surface-raised flex flex-col overflow-hidden">
+        {mode === "code" && showFileTree && (
+          <div
+            style={{ width: fileTreeWidth }}
+            className="flex-shrink-0 border-r border-border bg-surface-raised flex flex-col overflow-hidden relative"
+          >
             <div className="flex-1 overflow-y-auto py-1.5">
               {sortedUserFiles.map((path) => (
                 <div
                   key={path}
-                  onClick={() => {
-                    setActiveFile(path);
-                    setViewTab("code");
-                  }}
+                  onClick={() => setActiveFile(path)}
                   className={`group flex items-center justify-between gap-1 px-2.5 py-1.5 text-[11px] font-mono cursor-pointer truncate ${
                     activeFile === path
                       ? "bg-primary/10 text-primary font-semibold"
@@ -423,45 +410,50 @@ function Workspace({ title, artifactId, entry, dependencies, initialFiles, onSav
                 </button>
               )}
             </div>
+
+            {/* Desktop-only drag handle to resize the file tree */}
+            <div
+              onPointerDown={handleFileTreeResizeStart}
+              className="hidden lg:block absolute top-0 right-0 h-full w-1.5 -mr-0.5 cursor-col-resize hover:bg-primary/40 active:bg-primary/60 z-10 touch-none"
+              title="Drag to resize file tree"
+            />
           </div>
         )}
 
-        {/* Editor */}
-        <div className={`flex-1 min-w-0 overflow-hidden ${viewTab === "code" ? "block" : "hidden"} @lg/react-workspace:block`}>
-          <SandpackCodeEditor
-            showTabs={false}
-            showLineNumbers
-            showInlineErrors
-            wrapContent
-            style={{ height: "100%" }}
-          />
-        </div>
-
-        {/* Preview */}
-        <div
-          className={`flex-1 min-w-0 overflow-auto bg-surface-sunken flex items-start justify-center p-3 ${
-            viewTab === "preview" ? "flex" : "hidden"
-          } @lg/react-workspace:flex`}
-        >
-          <div
-            className="h-full border border-border rounded-lg overflow-auto bg-white shadow-sm"
-            style={{
-              width: devicePreset.width,
-              maxWidth: "100%",
-              resize: device === "desktop" ? "none" : "horizontal",
-              minWidth: "280px",
-            }}
-          >
-            <SandpackPreview
-              showNavigator={false}
-              showRefreshButton
-              showRestartButton={false}
-              showOpenInCodeSandbox={false}
-              showSandpackErrorOverlay
-              style={{ height: "100%", minHeight: "480px" }}
+        {mode === "code" && (
+          <div className="flex-1 min-w-0 overflow-hidden">
+            <SandpackCodeEditor
+              showTabs={false}
+              showLineNumbers
+              showInlineErrors
+              wrapContent
+              style={{ height: "100%" }}
             />
           </div>
-        </div>
+        )}
+
+        {mode === "preview" && (
+          <div className="flex-1 min-w-0 overflow-auto bg-surface-sunken flex items-start justify-center p-3">
+            <div
+              className="h-full border border-border rounded-lg overflow-auto bg-white shadow-sm"
+              style={{
+                width: devicePreset.width,
+                maxWidth: "100%",
+                resize: device === "desktop" ? "none" : "horizontal",
+                minWidth: "280px",
+              }}
+            >
+              <SandpackPreview
+                showNavigator={false}
+                showRefreshButton
+                showRestartButton={false}
+                showOpenInCodeSandbox={false}
+                showSandpackErrorOverlay
+                style={{ height: "100%", minHeight: "480px" }}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
