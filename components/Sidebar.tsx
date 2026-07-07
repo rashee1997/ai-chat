@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import {
   Plus,
   Search,
@@ -17,6 +17,7 @@ import {
   Star,
 } from "lucide-react";
 import type { DBConversation } from "@/lib/dbTypes";
+import { useResizableWidth } from "@/lib/useResizableWidth";
 
 const SIDEBAR_MIN_WIDTH = 200;
 const SIDEBAR_MAX_WIDTH = 420;
@@ -48,55 +49,13 @@ export default function Sidebar({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [width, setWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
-  const isResizing = useRef(false);
-
-  // Restore a remembered width (desktop-only resizing; see the drag handle below).
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
-      const parsed = stored ? parseInt(stored, 10) : NaN;
-      if (!Number.isNaN(parsed)) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of a value persisted outside React (localStorage)
-        setWidth(Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, parsed)));
-      }
-    } catch {
-      // Storage may be unavailable (private mode); fall back to the default width.
-    }
-  }, []);
-
-  useEffect(() => {
-    const handlePointerMove = (e: PointerEvent) => {
-      if (!isResizing.current) return;
-      setWidth(Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, e.clientX)));
-    };
-    const handlePointerUp = () => {
-      if (!isResizing.current) return;
-      isResizing.current = false;
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      setWidth((w) => {
-        try {
-          localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(w));
-        } catch {
-          // Storage may be unavailable (private mode); resizing still works for this tab.
-        }
-        return w;
-      });
-    };
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", handlePointerUp);
-    return () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", handlePointerUp);
-    };
-  }, []);
-
-  const handleResizeStart = () => {
-    isResizing.current = true;
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-  };
+  const { width, handleResizeStart } = useResizableWidth({
+    min: SIDEBAR_MIN_WIDTH,
+    max: SIDEBAR_MAX_WIDTH,
+    default: SIDEBAR_DEFAULT_WIDTH,
+    storageKey: SIDEBAR_WIDTH_STORAGE_KEY,
+    edge: "right",
+  });
 
   const filteredConversations = conversations.filter((c) =>
     c.title.toLowerCase().includes(search.toLowerCase())

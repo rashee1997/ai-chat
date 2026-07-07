@@ -2,24 +2,54 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
-import { X, History, ChevronLeft, ChevronRight, Check, RefreshCw, GitCompare, Loader2 } from "lucide-react";
+import {
+  X,
+  History,
+  ChevronLeft,
+  ChevronRight,
+  Check,
+  RefreshCw,
+  GitCompare,
+  Loader2,
+  Maximize2,
+  Minimize2,
+} from "lucide-react";
 import { Artifact } from "@/lib/types";
 import HTMLArtifact from "./HTMLArtifact";
-import WordArtifact from "./WordArtifact";
 import PPTArtifact from "./PPTArtifact";
-import ExcelArtifact from "./ExcelArtifact";
 import SVGArtifact from "./SVGArtifact";
 import MermaidArtifact from "./MermaidArtifact";
 import VisualDiff from "./VisualDiff";
 
-// Sandpack (~700KB) is only needed when a "react" artifact is actually
-// opened — load it on demand instead of bloating every page's bundle.
+// Sandpack (~700KB) and Univer (Sheets/Docs, each its own substantial
+// bundle) are only needed when that artifact type is actually opened —
+// load them on demand instead of bloating every page's bundle.
 const ReactArtifact = dynamic(() => import("./ReactArtifact"), {
   ssr: false,
   loading: () => (
     <div className="flex flex-col h-full items-center justify-center bg-surface-sunken rounded-xl border border-border gap-3 text-on-surface-muted">
       <Loader2 size={20} className="animate-spin text-primary" />
       <span className="text-xs font-medium">Loading React workspace…</span>
+    </div>
+  ),
+});
+
+const UniverSheetArtifact = dynamic(() => import("./UniverSheetArtifact"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex flex-col h-full items-center justify-center bg-surface-sunken rounded-xl border border-border gap-3 text-on-surface-muted">
+      <Loader2 size={20} className="animate-spin text-primary" />
+      <span className="text-xs font-medium">Loading spreadsheet…</span>
+    </div>
+  ),
+});
+
+const UniverDocArtifact = dynamic(() => import("./UniverDocArtifact"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex flex-col h-full items-center justify-center bg-surface-sunken rounded-xl border border-border gap-3 text-on-surface-muted">
+      <Loader2 size={20} className="animate-spin text-primary" />
+      <span className="text-xs font-medium">Loading document…</span>
     </div>
   ),
 });
@@ -41,7 +71,20 @@ export default function ArtifactPanel({
   const [restoredVersionNumber, setRestoredVersionNumber] = useState<number | null>(null);
   const [showDiff, setShowDiff] = useState(false);
   const [dragOffsetY, setDragOffsetY] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const touchStartY = useRef<number | null>(null);
+
+  // Desktop focus/fullscreen mode: Esc exits it. Only wired up while active
+  // so it doesn't interfere with the mobile sidebar's own Escape handler
+  // (app/page.tsx, which only acts when below the lg breakpoint).
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
 
   // Mobile-only swipe-down-to-close: track the vertical drag on the header/
   // grab handle and dismiss the panel past a threshold, snapping back otherwise.
@@ -65,9 +108,12 @@ export default function ArtifactPanel({
     touchStartY.current = null;
   };
 
-  // Fetch all saved versions of this artifact whenever it loads or changes
+  // Fetch all saved versions of this artifact once it's done streaming.
+  // Keyed on id + isComplete (not the whole object) so intermediate chunk
+  // updates during streaming don't re-fire this — otherwise every partial,
+  // not-yet-valid-JSON chunk gets POSTed as a "first version" save attempt.
   useEffect(() => {
-    if (!artifact) return;
+    if (!artifact || !artifact.isComplete) return;
 
     const fetchVersions = async () => {
       try {
@@ -113,7 +159,8 @@ export default function ArtifactPanel({
       setRestoredVersionNumber(null);
       setShowDiff(false);
     }, 0);
-  }, [artifact]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally excludes artifact.content: re-fetching on every keystroke-driven content change would refetch/re-save on our own writes
+  }, [artifact?.id, artifact?.isComplete]);
 
   if (!artifact) return null;
 
@@ -158,7 +205,9 @@ export default function ArtifactPanel({
 
   return (
     <div
-      className="h-full flex flex-col bg-surface border-l border-border shadow-2xl relative"
+      className={`flex flex-col bg-surface border-l border-border shadow-2xl ${
+        isFullscreen ? "fixed inset-0 z-50" : "relative h-full"
+      }`}
       id="artifact-panel-container"
       style={{
         transform: dragOffsetY ? `translateY(${dragOffsetY}px)` : undefined,
@@ -247,6 +296,15 @@ export default function ArtifactPanel({
             <span className="hidden @lg/artifact:inline">Versions ({versions.length || 1})</span>
           </button>
 
+          {/* Fullscreen/focus mode toggle — desktop only, mobile is already a full-viewport overlay */}
+          <button
+            onClick={() => setIsFullscreen((v) => !v)}
+            className="hidden lg:flex items-center justify-center min-w-[44px] min-h-[44px] text-on-surface-muted hover:text-on-surface transition-colors hover:bg-surface-sunken rounded-lg cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            title={isFullscreen ? "Exit fullscreen (Esc)" : "Enter fullscreen"}
+          >
+            {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+          </button>
+
           <button
             onClick={onClose}
             className="flex items-center justify-center min-w-[44px] min-h-[44px] lg:min-w-0 lg:min-h-0 lg:p-1.5 text-on-surface-muted hover:text-on-surface transition-colors hover:bg-surface-sunken rounded-lg cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
@@ -303,7 +361,7 @@ export default function ArtifactPanel({
                   />
                 )}
                 {artifact.type === "word" && (
-                  <WordArtifact
+                  <UniverDocArtifact
                     content={activeContent}
                     title={artifact.title}
                     id={artifact.id}
@@ -319,7 +377,7 @@ export default function ArtifactPanel({
                   />
                 )}
                 {artifact.type === "excel" && (
-                  <ExcelArtifact
+                  <UniverSheetArtifact
                     content={activeContent}
                     title={artifact.title}
                     id={artifact.id}

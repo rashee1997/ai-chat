@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Presentation, Download, ChevronLeft, ChevronRight, Play, Code, Check, Copy, Plus, Trash } from "lucide-react";
+import React, { useState } from "react";
+import { Download, ChevronLeft, ChevronRight, Copy, Plus, Trash } from "lucide-react";
 import PptxGenJS from "pptxgenjs";
+import ArtifactToolbar from "./ArtifactToolbar";
 
 interface PPTTheme {
   bg: string;
@@ -33,10 +34,9 @@ export default function PPTArtifact({
   id,
   onContentChange,
 }: PPTArtifactProps) {
-  const [activeTab, setActiveTab] = useState<"preview" | "code">("preview");
+  const [mode, setMode] = useState<"preview" | "code">("preview");
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [parseError, setParseError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   // Track props for render-phase sync
   const [prevContent, setPrevContent] = useState(content);
@@ -181,8 +181,6 @@ export default function PPTArtifact({
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(jsonString);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error(err);
     }
@@ -244,68 +242,21 @@ export default function PPTArtifact({
   const theme = pptData?.theme || { bg: "#0f172a", text: "#ffffff", accent: "#38bdf8" };
 
   return (
-    <div className="flex flex-col h-full bg-[#f9f9f8] rounded-xl shadow-md border border-[#ececec] overflow-hidden" id="ppt-artifact-wrapper">
-      {/* Header controls */}
-      <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-[#ececec]" id="ppt-artifact-header">
-        <div className="flex items-center space-x-2">
-          <Presentation size={18} className="text-orange-500" />
-          <span className="font-sans font-semibold text-[#1a1a1a] text-sm tracking-tight truncate max-w-xs">
-            {pptData?.slides[0]?.title || title}
-          </span>
-          <span className="text-xs bg-orange-50 border border-orange-200/50 text-orange-600 font-medium px-2 py-0.5 rounded-full">
-            Presentation
-          </span>
-        </div>
-
-        <div className="flex items-center space-x-1" id="ppt-controls">
-          <button
-            onClick={() => setActiveTab("preview")}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-              activeTab === "preview"
-                ? "bg-[#f3f4f6] text-[#1a1a1a]"
-                : "text-slate-500 hover:text-slate-900"
-            }`}
-          >
-            <Play size={14} className="text-orange-500" />
-            <span>Present Stage</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("code")}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-              activeTab === "code"
-                ? "bg-[#f3f4f6] text-[#1a1a1a]"
-                : "text-slate-500 hover:text-slate-900"
-            }`}
-          >
-            <Code size={14} className="text-slate-500" />
-            <span>JSON Slides</span>
-          </button>
-
-          <div className="w-px h-5 bg-[#ececec] mx-1" />
-
-          <button
-            onClick={handleCopy}
-            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-[#f3f4f6] transition-colors cursor-pointer"
-            title="Copy JSON"
-          >
-            {copied ? <Check size={16} className="text-emerald-500" /> : <Copy size={16} />}
-          </button>
-
-          <button
-            onClick={handleDownloadPptx}
-            className="flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white shadow-sm transition-all cursor-pointer"
-            title="Download Presentation"
-          >
-            <Download size={14} />
-            <span>Download .pptx</span>
-          </button>
-        </div>
-      </div>
+    <div className="flex flex-col h-full bg-surface-sunken rounded-xl shadow-md border border-border overflow-hidden" id="ppt-artifact-wrapper">
+      <ArtifactToolbar
+        mode={mode}
+        onModeChange={setMode}
+        previewLabel="Present Stage"
+        codeLabel="JSON Slides"
+        exportOptions={[
+          { label: "Copy JSON", onClick: handleCopy, icon: <Copy size={14} /> },
+          { label: "Download .pptx", onClick: handleDownloadPptx, icon: <Download size={14} /> },
+        ]}
+      />
 
       {/* Main Content Area */}
-      <div className="flex-1 bg-slate-100 flex min-h-[400px]">
-        {activeTab === "preview" && pptData && currentSlide ? (
+      <div className="flex-1 bg-slate-100 flex min-h-[400px] relative">
+        {mode === "preview" && pptData && currentSlide ? (
           <div className="flex-1 flex flex-col md:flex-row" id="presentation-stage">
             {/* Sidebar Slide Thumbnails */}
             <div className="w-full md:w-48 bg-slate-50 border-r border-slate-200 p-3 flex md:flex-col overflow-auto gap-2 select-none" id="thumbnails-rail">

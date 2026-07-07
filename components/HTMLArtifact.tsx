@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Play, Code, Download, Copy, Check, RotateCcw } from "lucide-react";
+import { Copy, Download } from "lucide-react";
+import ArtifactToolbar from "./ArtifactToolbar";
 
 interface HTMLArtifactProps {
   content: string;
@@ -16,8 +17,7 @@ export default function HTMLArtifact({
   id,
   onContentChange,
 }: HTMLArtifactProps) {
-  const [activeTab, setActiveTab] = useState<"preview" | "code">("preview");
-  const [copied, setCopied] = useState(false);
+  const [mode, setMode] = useState<"preview" | "code">("preview");
   const [editingCode, setEditingCode] = useState(content);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -30,7 +30,7 @@ export default function HTMLArtifact({
 
   // Update preview when content changes
   useEffect(() => {
-    if (activeTab === "preview" && iframeRef.current) {
+    if (mode === "preview" && iframeRef.current) {
       const iframe = iframeRef.current;
       const doc = iframe.contentDocument || iframe.contentWindow?.document;
       if (doc) {
@@ -48,7 +48,7 @@ export default function HTMLArtifact({
         doc.close();
       }
     }
-  }, [content, activeTab]);
+  }, [content, mode]);
 
   const handleCodeChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
@@ -59,8 +59,6 @@ export default function HTMLArtifact({
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(content);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error("Failed to copy!", err);
     }
@@ -78,7 +76,7 @@ export default function HTMLArtifact({
     URL.revokeObjectURL(url);
   };
 
-  const handleReset = () => {
+  const handleReload = () => {
     if (iframeRef.current) {
       const iframe = iframeRef.current;
       const doc = iframe.contentDocument || iframe.contentWindow?.document;
@@ -91,82 +89,20 @@ export default function HTMLArtifact({
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#f9f9f8] rounded-xl shadow-md border border-[#ececec] overflow-hidden" id="html-artifact-wrapper">
-      {/* Header controls */}
-      <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-[#ececec]" id="html-artifact-header">
-        <div className="flex items-center space-x-2">
-          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="font-sans font-semibold text-[#1a1a1a] text-sm tracking-tight truncate max-w-xs sm:max-w-md">
-            {title}
-          </span>
-          <span className="text-xs bg-emerald-50 border border-emerald-200/50 text-emerald-600 font-medium px-2 py-0.5 rounded-full">
-            Web App
-          </span>
-        </div>
-
-        <div className="flex items-center space-x-1" id="html-controls">
-          <button
-            onClick={() => setActiveTab("preview")}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-              activeTab === "preview"
-                ? "bg-[#f3f4f6] text-[#1a1a1a]"
-                : "text-slate-500 hover:text-slate-900"
-            }`}
-            id="tab-preview-btn"
-          >
-            <Play size={14} className="text-emerald-500" />
-            <span>Preview</span>
-          </button>
-          
-          <button
-            onClick={() => setActiveTab("code")}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-              activeTab === "code"
-                ? "bg-[#f3f4f6] text-[#1a1a1a]"
-                : "text-slate-500 hover:text-slate-900"
-            }`}
-            id="tab-code-btn"
-          >
-            <Code size={14} className="text-blue-500" />
-            <span>Code</span>
-          </button>
-
-          <div className="w-px h-5 bg-[#ececec] mx-1" />
-
-          <button
-            onClick={handleCopy}
-            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-[#f3f4f6] transition-colors cursor-pointer"
-            title="Copy Code"
-            id="copy-code-btn"
-          >
-            {copied ? <Check size={16} className="text-emerald-500" /> : <Copy size={16} />}
-          </button>
-
-          <button
-            onClick={handleDownload}
-            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-[#f3f4f6] transition-colors cursor-pointer"
-            title="Download Code"
-            id="download-html-btn"
-          >
-            <Download size={16} />
-          </button>
-
-          {activeTab === "preview" && (
-            <button
-              onClick={handleReset}
-              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-[#f3f4f6] transition-colors cursor-pointer"
-              title="Restart Application"
-              id="reset-preview-btn"
-            >
-              <RotateCcw size={16} />
-            </button>
-          )}
-        </div>
-      </div>
+    <div className="flex flex-col h-full bg-surface-sunken rounded-xl shadow-md border border-border overflow-hidden" id="html-artifact-wrapper">
+      <ArtifactToolbar
+        mode={mode}
+        onModeChange={setMode}
+        onReload={handleReload}
+        exportOptions={[
+          { label: "Copy code", onClick: handleCopy, icon: <Copy size={14} /> },
+          { label: "Download .html", onClick: handleDownload, icon: <Download size={14} /> },
+        ]}
+      />
 
       {/* Main Content Area */}
-      <div className="flex-1 bg-slate-100 relative min-h-[400px]">
-        {activeTab === "preview" ? (
+      <div className="flex-1 bg-surface-sunken relative min-h-[400px]">
+        {mode === "preview" ? (
           <iframe
             ref={iframeRef}
             className="absolute inset-0 w-full h-full border-none bg-white"

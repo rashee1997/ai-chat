@@ -37,6 +37,15 @@ const nextConfig: NextConfig = {
     // unset (fully permissive, matching current behavior) so it doesn't
     // newly restrict anything else the app already does (AI-generated HTML
     // artifacts loading arbitrary CDN scripts/fonts, blob/data URL exports).
+    // "https://vercel.live" in frame-src/script-src is Vercel's own preview
+    // comments/toolbar overlay, injected automatically on Vercel preview
+    // deployments — without it the toolbar's iframe and script are blocked.
+    // "blob:" in script-src is required for Univer's Sheets/Docs workspace
+    // (components/UniverSheetArtifact.tsx, UniverDocArtifact.tsx): its
+    // formula/calculation engine spins up a Web Worker from a blob: URL when
+    // no explicit `workerURL` is configured, and `worker-src` falls back to
+    // `script-src` when unset — without "blob:" here that worker script load
+    // is blocked and the sheet/doc silently fails to fully initialize.
     return [
       {
         source: '/:path*',
@@ -44,7 +53,8 @@ const nextConfig: NextConfig = {
           {
             key: 'Content-Security-Policy',
             value: [
-              "frame-src 'self' https://*.codesandbox.io",
+              "frame-src 'self' https://*.codesandbox.io https://vercel.live",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https://vercel.live",
               "connect-src 'self' https://*.codesandbox.io https://codesandbox.io",
               "form-action 'self' https://codesandbox.io",
             ].join('; '),
