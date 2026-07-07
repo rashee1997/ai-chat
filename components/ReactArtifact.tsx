@@ -160,8 +160,29 @@ interface WorkspaceProps {
 }
 
 function Workspace({ artifactId, entry, dependencies, initialFiles, onSave }: WorkspaceProps) {
-  const { sandpack } = useSandpack();
-  const { activeFile, files, editorState, setActiveFile, addFile, deleteFile } = sandpack;
+  const { sandpack, listen } = useSandpack();
+  const { activeFile, files, editorState, setActiveFile, addFile, deleteFile, status, error } = sandpack;
+
+  // Debug instrumentation for the "preview stays blank" failure mode: logs
+  // every message the Sandpack bundler iframe sends back (or the total
+  // absence of any, which points at the iframe never loading at all — e.g.
+  // blocked by CSP/network — rather than a compile error inside it).
+  useEffect(() => {
+    console.log(`[Sandpack] status=${status}`, error ? { error } : "");
+  }, [status, error]);
+
+  useEffect(() => {
+    const unsubscribe = listen((message) => {
+      if (message.type === "action" && message.action === "show-error") {
+        console.error("[Sandpack] bundler error:", message);
+      } else if (message.type === "done") {
+        console.log("[Sandpack] compile done, compilationError:", message.compilatonError);
+      } else {
+        console.log("[Sandpack] message:", message.type, message);
+      }
+    });
+    return unsubscribe;
+  }, [listen]);
 
   // `sandpack.visibleFiles` is fixed from the initial `options.visibleFiles`
   // prop and does NOT grow when `addFile` is called at runtime, and the
