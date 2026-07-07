@@ -127,9 +127,9 @@ export default function ArtifactToolbar({
 
             {exportOpen && (
               <div className="absolute right-0 mt-1 w-48 bg-surface-raised border border-border rounded-lg shadow-lg z-30 overflow-hidden py-1">
-                {exportOptions.map((opt) => (
+                {exportOptions.map((opt, index) => (
                   <button
-                    key={opt.label}
+                    key={index}
                     onClick={() => {
                       opt.onClick();
                       setExportOpen(false);

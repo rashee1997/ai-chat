@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Download, Copy, Loader2 } from "lucide-react";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from "docx";
 import ArtifactToolbar from "./ArtifactToolbar";
@@ -41,7 +41,6 @@ export default function UniverDocArtifact({ content, title, id, onContentChange 
   const [mode, setMode] = useState<"preview" | "code">("preview");
   const [ready, setReady] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
-  const [codeView, setCodeView] = useState(content);
 
   useEffect(() => {
     onContentChangeRef.current = onContentChange;
@@ -120,13 +119,20 @@ export default function UniverDocArtifact({ content, title, id, onContentChange 
     }
   }, [content]);
 
-  // Refresh the read-only JSON view when switching into Code mode. Done in
-  // this click handler (not derived during render) because reading the ref
-  // to the live Univer instance is only safe outside of render.
-  const handleModeChange = (newMode: "preview" | "code") => {
-    if (newMode === "code") setCodeView(readCurrentWordJson());
-    setMode(newMode);
-  };
+  // The Code view always reflects the latest `content` prop (pretty-printed)
+  // rather than a separately-tracked snapshot, so it can never go stale —
+  // e.g. when an older version is restored while Code mode is still open.
+  // It may lag the live, not-yet-debounce-saved edit by up to the 1.5s
+  // commitSave delay; Copy/Export read the live Univer state directly
+  // instead (via readCurrentWordJson) since those need the exact current
+  // edit, not the last-saved one.
+  const codeView = useMemo(() => {
+    try {
+      return JSON.stringify(JSON.parse(content || "{}"), null, 2);
+    } catch {
+      return content;
+    }
+  }, [content]);
 
   const handleCopy = useCallback(async () => {
     try {
@@ -190,7 +196,7 @@ export default function UniverDocArtifact({ content, title, id, onContentChange 
     <div className="flex flex-col h-full bg-surface-sunken rounded-xl shadow-md border border-border overflow-hidden">
       <ArtifactToolbar
         mode={mode}
-        onModeChange={handleModeChange}
+        onModeChange={setMode}
         previewLabel="Document"
         codeLabel="JSON Content"
         exportOptions={[
@@ -202,13 +208,7 @@ export default function UniverDocArtifact({ content, title, id, onContentChange 
         <div ref={containerRef} className={`absolute inset-0 ${mode === "preview" ? "block" : "hidden"}`} />
         {mode === "code" && (
           <pre className="absolute inset-0 overflow-auto p-4 bg-slate-950 text-blue-300 font-mono text-xs leading-relaxed">
-            {(() => {
-              try {
-                return JSON.stringify(JSON.parse(codeView || "{}"), null, 2);
-              } catch {
-                return codeView;
-              }
-            })()}
+            {codeView}
           </pre>
         )}
         {!ready && (
